@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="dashboard-section">
+    <div class="container">
+        <div class="dashboard-intro">
+            <div>
+                <p class="eyebrow">Student dashboard</p>
+                <h1>Good to see you, {{ current_user.name.split()[0] }}.</h1>
+                <p>Your practice space is ready. Choose a skill and start building momentum.</p>
+            </div>
+            <div class="status-chip"><span class="status-dot"></span> Free plan</div>
+        </div>
+
+        <div class="progress-panel">
+            <div class="panel-heading">
+                <div><p class="eyebrow">Your starting allowance</p><h2>Practice across all four skills</h2></div>
+                <span class="panel-note">30 free mocks</span>
+            </div>
+            <div class="dashboard-skills">
+                <a class="dashboard-skill" href="{{ url_for('mocks.index') }}"><span class="skill-icon reading-icon">R</span><div><strong>Reading</strong><span>10 mocks available</span></div><span class="skill-arrow">→</span></a>
+                <a class="dashboard-skill" href="{{ url_for('mocks.index') }}"><span class="skill-icon listening-icon">L</span><div><strong>Listening</strong><span>10 mocks available</span></div><span class="skill-arrow">→</span></a>
+                <div class="dashboard-skill"><span class="skill-icon speaking-icon">S</span><div><strong>Speaking</strong><span>5 mocks available</span></div><span class="skill-arrow">→</span></div>
+                <div class="dashboard-skill"><span class="skill-icon writing-icon">W</span><div><strong>Writing</strong><span>5 mocks available</span></div><span class="skill-arrow">→</span></div>
+            </div>
+        </div>
+
+        <div class="coming-soon">
+            <span class="coming-icon">✦</span>
+            <div><h2>Your practice library is coming next.</h2><p>Mock tests, scores, and progress history will appear here as each skill is added.</p></div>
+        </div>
+    </div>
+</section>
+{% endblock %}

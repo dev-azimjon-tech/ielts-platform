@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}{{ mock.title }} · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="mock-take-section">
+    <div class="container mock-shell">
+        <div class="mock-header">
+            <div>
+                <a class="back-link" href="{{ url_for('mocks.index') }}">← All mocks</a>
+                <p class="eyebrow">{{ mock.skill|capitalize }} mock</p>
+                <h1>{{ mock.title }}</h1>
+                <p>{{ mock.description }}</p>
+            </div>
+            <div class="mock-header-stats"><span>⏱ {{ mock.time_limit_minutes }} min</span><span>{{ remaining }} free remaining</span></div>
+        </div>
+
+        <div class="step-toolbar">
+            <span class="step-kind">{% if mock.skill == 'reading' %}Passage{% else %}Section{% endif %}</span>
+            <span id="step-progress">1 of {{ mock.steps|length }}</span>
+        </div>
+
+        <form method="post" action="{{ url_for('mocks.submit', mock_id=mock.id) }}" id="mock-form">
+            {% for step in mock.steps %}
+                <section class="mock-step {% if loop.first %}is-active{% endif %}" data-step-index="{{ loop.index0 }}" aria-hidden="{{ 'false' if loop.first else 'true' }}">
+                    <div class="step-heading">
+                        <div>
+                            <p class="eyebrow">{% if mock.skill == 'reading' %}Passage {{ loop.index }}{% else %}Section {{ loop.index }}{% endif %}</p>
+                            <h2>{{ step.title }}</h2>
+                        </div>
+                        <span class="question-range">Questions {{ step.start_question }}–{{ step.end_question }}</span>
+                    </div>
+
+                    {% if mock.skill == 'reading' %}
+                        <article class="passage-card"><div class="passage-body">{{ step.body }}</div></article>
+                    {% else %}
+                        <div class="listening-instructions">
+                            <span class="instruction-icon">i</span>
+                            <div><strong>Before the audio starts</strong><p>Read questions {{ step.start_question }}–{{ step.end_question }}. You have <strong>20 seconds</strong> to read the instructions and questions. The audio will start automatically after the countdown.</p></div>
+                        </div>
+                        <div class="audio-panel" data-audio-step="{{ loop.index0 }}">
+                            <div><span class="audio-label">LISTENING AUDIO · DEMO</span><h3>{{ step.title }}</h3><p>The demo uses your browser's speech voice. A recorded MP3 can replace it later.</p></div>
+                            <button class="button audio-button start-audio" data-step-index="{{ loop.index0 }}" type="button">Start <span aria-hidden="true">▶</span></button>
+                            <p class="audio-status" aria-live="polite">Press Start, then read while the countdown runs.</p>
+                        </div>
+                    {% endif %}
+
+                    <div class="questions-card step-questions">
+                        <div class="questions-heading"><div><p class="eyebrow">Answer these questions</p><h2>{{ step.questions|length }} questions</h2></div><span>1 point each</span></div>
+                        {% for question in step.questions %}
+                            <fieldset class="question-block">
+                                <legend><span class="question-number">{{ question.question_number }}</span>{{ question.prompt }}</legend>
+                                {% if question.options %}
+                                    <div class="options-list">
+                                        {% for option in question.options %}
+                                            <label class="option-label"><input type="radio" name="question_{{ question.id }}" value="{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] if question.question_type == 'multiple_choice' else option }}"><span>{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] ~ '. ' if question.question_type == 'multiple_choice' else '' }}{{ option }}</span></label>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <input class="answer-input" type="text" name="question_{{ question.id }}" autocomplete="off" placeholder="Type your answer here">
+                                {% endif %}
+                            </fieldset>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+
+            <div class="step-navigation">
+                <button class="step-button step-previous" id="previous-step" type="button" disabled><span aria-hidden="true">&lt;</span> Previous</button>
+                <div class="step-navigation-right">
+                    <button class="button step-next" id="next-step" type="button">{% if mock.skill == 'reading' %}Next passage{% else %}Next section{% endif %} <span aria-hidden="true">&gt;</span></button>
+                    <button class="button step-submit" id="submit-mock" type="submit" hidden>Submit mock <span aria-hidden="true">→</span></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<script>
+    const mockSteps = {{ mock.steps|tojson }};
+    const stepCards = Array.from(document.querySelectorAll('.mock-step'));
+    const progressLabel = document.getElementById('step-progress');
+    const previousButton = document.getElementById('previous-step');
+    const nextButton = document.getElementById('next-step');
+    const submitButton = document.getElementById('submit-mock');
+    const listeningMock = {{ 'true' if mock.skill == 'listening' else 'false' }};
+    let activeStep = 0;
+    let countdownTimer = null;
+    let countdownButton = null;
+    let speakingStep = null;
+    let allowExit = false;
+    const exitMessage = 'You have not submitted this mock yet. Do you really want to leave? Your answers will be lost.';
+
+    function resetAudioButton(button) {
+        if (!button) return;
+        button.disabled = false;
+        button.innerHTML = button.dataset.started === 'true' ? 'Play again <span aria-hidden="true">▶</span>' : 'Start <span aria-hidden="true">▶</span>';
+    }
+
+    function stopPlayback() {
+        if (countdownTimer) {
+            window.clearInterval(countdownTimer);
+            countdownTimer = null;
+        }
+        if (countdownButton) {
+            countdownButton.dataset.counting = 'false';
+            resetAudioButton(countdownButton);
+            countdownButton = null;
+        }
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        speakingStep = null;
+    }
+
+    function playSectionAudio(stepIndex, button) {
+        if (!('speechSynthesis' in window)) {
+            button.parentElement.querySelector('.audio-status').textContent = 'Your browser does not support demo audio. A recorded audio file will be added in a later version.';
+            return;
+        }
+
+        stopPlayback();
+        const status = button.parentElement.querySelector('.audio-status');
+        const utterance = new SpeechSynthesisUtterance(mockSteps[stepIndex].script);
+        utterance.rate = 0.88;
+        speakingStep = stepIndex;
+        button.innerHTML = 'Stop <span aria-hidden="true">■</span>';
+        status.textContent = 'Audio is playing…';
+        utterance.onend = () => {
+            if (speakingStep === stepIndex) {
+                speakingStep = null;
+                button.dataset.started = 'true';
+                resetAudioButton(button);
+                status.textContent = 'Audio finished. Continue with the questions.';
+            }
+        };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function startSectionAudio(button) {
+        const stepIndex = Number(button.dataset.stepIndex);
+        if (speakingStep === stepIndex) {
+            stopPlayback();
+            resetAudioButton(button);
+            button.parentElement.querySelector('.audio-status').textContent = 'Audio stopped. Press Play again when ready.';
+            return;
+        }
+        if (button.dataset.started === 'true') {
+            playSectionAudio(stepIndex, button);
+            return;
+        }
+
+        stopPlayback();
+        let seconds = 20;
+        const status = button.parentElement.querySelector('.audio-status');
+        countdownButton = button;
+        button.dataset.counting = 'true';
+        button.disabled = true;
+        button.textContent = `Read questions: ${seconds}s`;
+        status.textContent = 'Read the instructions and questions. Audio will start automatically.';
+        countdownTimer = window.setInterval(() => {
+            seconds -= 1;
+            if (seconds <= 0) {
+                window.clearInterval(countdownTimer);
+                countdownTimer = null;
+                countdownButton = null;
+                button.dataset.counting = 'false';
+                button.dataset.started = 'true';
+                button.disabled = false;
+                playSectionAudio(stepIndex, button);
+                return;
+            }
+            button.textContent = `Read questions: ${seconds}s`;
+        }, 1000);
+    }
+
+    function showStep(nextIndex) {
+        stopPlayback();
+        activeStep = nextIndex;
+        stepCards.forEach((card, index) => {
+            const active = index === activeStep;
+            card.classList.toggle('is-active', active);
+            card.setAttribute('aria-hidden', active ? 'false' : 'true');
+        });
+        progressLabel.textContent = `${activeStep + 1} of ${stepCards.length}`;
+        previousButton.disabled = activeStep === 0;
+        const isLastStep = activeStep === stepCards.length - 1;
+        nextButton.hidden = isLastStep;
+        submitButton.hidden = !isLastStep;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    previousButton.addEventListener('click', () => showStep(activeStep - 1));
+    nextButton.addEventListener('click', () => showStep(activeStep + 1));
+
+    document.getElementById('mock-form').addEventListener('submit', () => {
+        allowExit = true;
+        stopPlayback();
+    });
+
+    document.querySelectorAll('a[href]').forEach((link) => {
+        link.addEventListener('click', (event) => {
+            if (allowExit || link.target === '_blank') return;
+            if (!window.confirm(exitMessage)) {
+                event.preventDefault();
+                return;
+            }
+            allowExit = true;
+            stopPlayback();
+        });
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+        if (allowExit) return;
+        event.preventDefault();
+        event.returnValue = exitMessage;
+        return exitMessage;
+    });
+
+    if (listeningMock) {
+        document.querySelectorAll('.start-audio').forEach((button) => {
+            button.addEventListener('click', () => startSectionAudio(button));
+        });
+    }
+</script>
+{% endblock %}

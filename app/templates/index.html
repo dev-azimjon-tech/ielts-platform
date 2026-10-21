@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Affordable IELTS preparation{% endblock %}
+
+{% block content %}
+<section class="hero-section">
+    <div class="container hero-grid">
+        <div class="hero-copy">
+            <p class="eyebrow">Your next band score starts here</p>
+            <h1>Prepare with purpose.<br><span>Pay less.</span></h1>
+            <p class="hero-lede">Practice every IELTS skill with focused mock tests designed to help students build confidence without expensive subscriptions.</p>
+            <div class="hero-actions">
+                <a class="button" href="{{ url_for('auth.register') }}">Start practicing <span aria-hidden="true">→</span></a>
+                <a class="text-link" href="{{ url_for('auth.login') }}">I already have an account</a>
+            </div>
+        </div>
+        <div class="hero-card" aria-label="Free practice allowance">
+            <div class="card-glow"></div>
+            <div class="hero-card-top">
+                <span class="pill">FREE START</span>
+                <span class="spark" aria-hidden="true">✦</span>
+            </div>
+            <h2>Build your<br>confidence.</h2>
+            <p>Get a real feel for the exam before you commit to premium practice.</p>
+            <div class="skill-list">
+                <div><span>Reading</span><strong>10 mocks</strong></div>
+                <div><span>Listening</span><strong>10 mocks</strong></div>
+                <div><span>Speaking</span><strong>5 mocks</strong></div>
+                <div><span>Writing</span><strong>5 mocks</strong></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="values-section">
+    <div class="container values-grid">
+        <div>
+            <p class="eyebrow">Made for your journey</p>
+            <h2>Everything you need to move forward.</h2>
+        </div>
+        <div class="value-item"><span class="value-number">01</span><div><h3>Practice with direction</h3><p>Work through structured mocks across all four IELTS skills.</p></div></div>
+        <div class="value-item"><span class="value-number">02</span><div><h3>See your progress</h3><p>Keep your attempts and results in one simple student dashboard.</p></div></div>
+        <div class="value-item"><span class="value-number">03</span><div><h3>Stay within reach</h3><p>Start free, then continue for only $5 when you are ready for more.</p></div></div>
+    </div>
+</section>
+{% endblock %}

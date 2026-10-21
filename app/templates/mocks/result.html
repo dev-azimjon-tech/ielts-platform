@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Your result · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="mock-take-section">
+    <div class="container result-shell">
+        <div class="result-hero">
+            <p class="eyebrow">Mock complete</p>
+            <h1>{{ mock.title }}</h1>
+            <div class="score-circle"><strong>{{ score }}</strong><span>/ {{ total }}</span></div>
+            <p>You answered {{ score }} of {{ total }} questions correctly.</p>
+            <a class="button" href="{{ url_for('mocks.index') }}">Try another mock <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="review-card">
+            <div class="questions-heading"><div><p class="eyebrow">Answer review</p><h2>Learn from each question</h2></div><span>{{ ((score / total) * 100)|round|int }}%</span></div>
+            {% for question in questions %}
+                <div class="review-row {{ 'review-correct' if question.is_correct else 'review-wrong' }}">
+                    <div class="review-title"><span class="question-number">{{ question.question_number }}</span><strong>{{ question.prompt }}</strong><span class="review-mark">{{ '✓' if question.is_correct else '×' }}</span></div>
+                    <div class="review-answer"><span>Your answer: <strong>{{ question.submitted_answer }}</strong></span><span>Correct: <strong>{{ question.correct_answer }}</strong></span></div>
+                    <p>{{ question.explanation }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
