@@ -12,7 +12,7 @@
                 <h1>{{ mock.title }}</h1>
                 <p>{{ mock.description }}</p>
             </div>
-            <div class="mock-header-stats"><span>⏱ {{ mock.time_limit_minutes }} min</span><span>{{ remaining }} free remaining</span></div>
+            <div class="mock-header-stats"><span>⏱ {{ mock.time_limit_minutes }} min</span>{% if current_user.is_premium %}<span class="premium-inline">Premium access</span>{% else %}<span>{{ remaining }} free remaining</span>{% endif %}</div>
         </div>
 
         <div class="step-toolbar">

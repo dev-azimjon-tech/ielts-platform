@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{% if editing %}Edit content{% else %}Add content{% endif %} · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="admin-section">
+    <div class="container admin-narrow">
+        <a class="back-link" href="{{ url_for('admin.edit_mock', mock_id=mock.id) }}">← Back to {{ mock.title }}</a>
+        <div class="admin-card admin-form-card">
+            <p class="eyebrow">{{ mock.skill|capitalize }} / {{ 'Edit content' if editing else 'Add content' }}</p>
+            <h1>{% if editing %}{% if mock.skill == 'reading' %}Edit passage{% else %}Edit listening section{% endif %}{% else %}{% if mock.skill == 'reading' %}New passage{% else %}New listening section{% endif %}{% endif %}</h1>
+            <p class="admin-muted">Students see this content one passage or section at a time.</p>
+            <form class="admin-form" method="post">
+                <div class="field"><label for="title">Title</label><input id="title" name="title" value="{{ values.title }}" placeholder="Urban trees and healthy streets" required></div>
+                <div class="field"><label for="{{ 'body' if mock.skill == 'reading' else 'script' }}">{{ 'Passage text' if mock.skill == 'reading' else 'Listening script' }}</label><textarea id="{{ 'body' if mock.skill == 'reading' else 'script' }}" name="{{ 'body' if mock.skill == 'reading' else 'script' }}" rows="18" required>{{ values.body }}</textarea></div>
+                <div class="admin-form-actions"><button class="button" type="submit">{{ 'Save content' if editing else 'Add content' }}</button><a class="button button-outline" href="{{ url_for('admin.edit_mock', mock_id=mock.id) }}">Cancel</a></div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

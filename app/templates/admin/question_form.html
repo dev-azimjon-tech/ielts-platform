@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Add question · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="admin-section">
+    <div class="container admin-narrow">
+        <a class="back-link" href="{{ url_for('admin.edit_mock', mock_id=mock.id) }}">← Back to {{ mock.title }}</a>
+        <div class="admin-card admin-form-card">
+            <p class="eyebrow">{{ mock.skill|capitalize }} / {{ content.title }}</p>
+            <h1>{{ 'Edit question' if editing else 'Add question' }}</h1>
+            <p class="admin-muted">Question numbers are assigned automatically. For multiple choice, enter one option per line and use A, B, C, or D as the answer.</p>
+            <form class="admin-form" method="post">
+                <div class="field"><label for="question_type">Question type</label><select id="question_type" name="question_type" required><option value="multiple_choice" {% if values.question_type == 'multiple_choice' %}selected{% endif %}>Multiple choice</option><option value="tfng" {% if values.question_type == 'tfng' %}selected{% endif %}>True / False / Not Given</option><option value="short_answer" {% if values.question_type == 'short_answer' %}selected{% endif %}>Short answer</option></select></div>
+                <div class="field"><label for="prompt">Question prompt</label><textarea id="prompt" name="prompt" rows="4" required>{{ values.prompt }}</textarea></div>
+                <div class="field"><label for="options">Options <span class="field-help">(one per line; leave empty for short answer)</span></label><textarea id="options" name="options" rows="5">{{ values.options|join('\n') }}</textarea></div>
+                <div class="form-row"><div class="field"><label for="correct_answer">Correct answer</label><input id="correct_answer" name="correct_answer" value="{{ values.correct_answer }}" placeholder="B or roots" required></div><div class="field"><label for="explanation">Explanation</label><input id="explanation" name="explanation" value="{{ values.explanation }}" placeholder="Why this answer is correct"></div></div>
+                <div class="admin-form-actions"><button class="button" type="submit">{{ 'Save question' if editing else 'Add question' }}</button><a class="button button-outline" href="{{ url_for('admin.edit_mock', mock_id=mock.id) }}">Cancel</a></div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

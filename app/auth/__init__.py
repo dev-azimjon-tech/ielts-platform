@@ -73,6 +73,33 @@ def login():
     return render_template("auth/login.html")
 
 
+@auth_bp.route("/admin-login", methods=("GET", "POST"))
+def admin_login():
+    """Sign in through the dedicated administrator entry point."""
+    if current_user.is_authenticated:
+        if current_user.is_admin:
+            return redirect(url_for("admin.index"))
+        return redirect(url_for("main.dashboard"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        user = User.get_by_email(email)
+
+        if (
+            user is None
+            or not user.is_admin
+            or not check_password_hash(user.password_hash, password)
+        ):
+            flash("Admin username or password is incorrect.", "error")
+        else:
+            login_user(user)
+            flash("Welcome to the admin panel.", "success")
+            return redirect(url_for("admin.index"))
+
+    return render_template("auth/admin_login.html")
+
+
 @auth_bp.route("/logout", methods=("POST",))
 @login_required
 def logout():

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Manage mocks · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="admin-section">
+    <div class="container">
+        <div class="page-heading admin-heading">
+            <div><p class="eyebrow">Administration / Content</p><h1>Mock tests</h1><p>Build Reading and Listening tests from draft to published practice.</p></div>
+            <a class="button" href="{{ url_for('admin.new_mock') }}">+ New mock</a>
+        </div>
+        {% if mocks %}
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead><tr><th>Mock</th><th>Skill</th><th>Content</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        {% for mock in mocks %}
+                            <tr>
+                                <td><strong>{{ mock.title }}</strong><span>{{ mock.time_limit_minutes }} minutes</span></td>
+                                <td><span class="skill-tag skill-tag-{{ mock.skill }}">{{ mock.skill }}</span></td>
+                                <td><span>{{ mock.section_count }} {% if mock.skill == 'reading' %}passages{% else %}sections{% endif %}</span><span>{{ mock.question_count }} questions</span></td>
+                                <td><span class="status-badge {% if mock.is_published %}status-published{% else %}status-draft{% endif %}">{% if mock.is_published %}Published{% else %}Draft{% endif %}</span></td>
+                                <td class="table-action"><a class="button button-small button-outline" href="{{ url_for('admin.edit_mock', mock_id=mock.id) }}">Edit →</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state"><h2>No mocks yet</h2><p>Create your first draft mock to start adding content.</p><a class="button" href="{{ url_for('admin.new_mock') }}">Create a mock</a></div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}AI feedback · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="ai-section">
+    <div class="container ai-result-shell">
+        <a class="back-link" href="{{ url_for('ai.index') }}">← AI practice library</a>
+        <div class="ai-result-hero"><p class="eyebrow">AI {{ result.skill|capitalize }} feedback</p><h1>{{ result.title }}</h1><div class="ai-band-circle"><strong>{{ result.feedback.overall_band }}</strong><span>estimated band</span></div><p>This is an AI practice estimate, not an official IELTS result.</p></div>
+        <div class="ai-criteria-grid">
+            {% if result.skill == 'writing' %}
+                <div class="ai-criterion"><span>Task response</span><strong>{{ result.feedback.task_response_band }}</strong></div><div class="ai-criterion"><span>Coherence</span><strong>{{ result.feedback.coherence_band }}</strong></div><div class="ai-criterion"><span>Lexical resource</span><strong>{{ result.feedback.lexical_band }}</strong></div><div class="ai-criterion"><span>Grammar</span><strong>{{ result.feedback.grammar_band }}</strong></div>
+            {% else %}
+                <div class="ai-criterion"><span>Fluency</span><strong>{{ result.feedback.fluency_band }}</strong></div><div class="ai-criterion"><span>Lexical resource</span><strong>{{ result.feedback.lexical_band }}</strong></div><div class="ai-criterion"><span>Grammar</span><strong>{{ result.feedback.grammar_band }}</strong></div><div class="ai-criterion"><span>Pronunciation estimate</span><strong>{{ result.feedback.pronunciation_band }}</strong></div>
+            {% endif %}
+        </div>
+        <div class="ai-feedback-grid"><section class="ai-feedback-card"><p class="eyebrow">Examiner summary</p><p class="ai-feedback-text">{{ result.feedback.feedback }}</p></section><section class="ai-feedback-card"><p class="eyebrow">What you did well</p><ul>{% for item in result.feedback.strengths %}<li>{{ item }}</li>{% endfor %}</ul></section><section class="ai-feedback-card"><p class="eyebrow">Next improvements</p><ul>{% for item in result.feedback.improvements %}<li>{{ item }}</li>{% endfor %}</ul></section></div>
+        {% if result.skill == 'speaking' %}
+            <section class="ai-transcript-card"><p class="eyebrow">Speaking transcript</p><h2>What the AI heard</h2>{% for turn in result.turns %}<div class="transcript-turn"><span>Part {{ turn.part }}</span><div><strong>{{ turn.question }}</strong><p>{{ turn.transcript }}</p></div></div>{% endfor %}</section>
+        {% else %}
+            <details class="ai-submission-card"><summary>View submitted essay</summary><p>{{ result.submission_text }}</p></details>
+        {% endif %}
+        <a class="button" href="{{ url_for('ai.index') }}">Try another AI practice →</a>
+    </div>
+</section>
+{% endblock %}

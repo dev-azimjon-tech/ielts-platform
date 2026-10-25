@@ -44,7 +44,7 @@ def test_mock_library_and_reading_submission(client):
 
     response = client.get("/mocks/1")
     assert response.status_code == 200
-    assert b"The Repair Caf" in response.data
+    assert b"The Hidden Life of Urban Trees" in response.data
     assert b"Next passage" in response.data
     assert b"not submitted this mock yet" in response.data
 

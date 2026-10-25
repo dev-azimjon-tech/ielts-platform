@@ -19,7 +19,7 @@
                 <article class="mock-card">
                     <div class="mock-card-top">
                         <span class="skill-tag skill-tag-{{ mock.skill }}">{{ mock.skill|capitalize }}</span>
-                        <span class="mock-count">{{ mock.remaining }} / {{ mock.limit }} free</span>
+                        {% if current_user.is_premium %}<span class="mock-count premium-count">Premium access</span>{% else %}<span class="mock-count">{{ mock.remaining }} / {{ mock.limit }} free</span>{% endif %}
                     </div>
                     <h2>{{ mock.title }}</h2>
                     <p>{{ mock.description }}</p>

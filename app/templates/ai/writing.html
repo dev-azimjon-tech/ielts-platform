@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}{{ mock.title }} · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="ai-section ai-test-section">
+    <div class="container ai-test-shell">
+        <div class="ai-test-header"><div><a class="back-link" href="{{ url_for('ai.index') }}">← AI practice</a><p class="eyebrow">AI Writing checker</p><h1>{{ mock.title }}</h1><p>{{ mock.description }}</p></div><div class="mock-header-stats"><span>⏱ {{ mock.time_limit_minutes }} min</span><span>{{ limit - attempt_count }} AI checks left</span></div></div>
+        <div class="ai-exam-notice"><strong>Practice task</strong><span>{{ mock.task.instructions }} Your AI band estimate will include feedback for all four IELTS Writing criteria.</span></div>
+        <article class="writing-task-card"><p class="eyebrow">{{ mock.task.task_type }}</p><h2>{{ mock.task.prompt }}</h2><p class="writing-task-note">Aim for at least {{ mock.task.minimum_words }} words. Organise your answer into clear paragraphs and support your ideas with examples.</p></article>
+        <form class="writing-form" method="post" id="writing-form">
+            <div class="writing-editor-top"><div><p class="eyebrow">Your response</p><h2>Write your essay</h2></div><span id="word-count">{{ word_count }} words</span></div>
+            <textarea name="essay" id="essay" rows="20" placeholder="Write your answer here..." required>{{ essay }}</textarea>
+            <div class="writing-submit-row"><span>AI feedback is an estimate for learning.</span><button class="button" type="submit">Check with AI <span aria-hidden="true">→</span></button></div>
+        </form>
+    </div>
+</section>
+<script>
+    const essay = document.getElementById('essay');
+    const wordCount = document.getElementById('word-count');
+    essay.addEventListener('input', () => { wordCount.textContent = `${essay.value.trim() ? essay.value.trim().split(/\s+/).length : 0} words`; });
+    document.getElementById('writing-form').addEventListener('submit', (event) => { if (essay.value.trim().split(/\s+/).filter(Boolean).length < 50) { event.preventDefault(); alert('Please write at least 50 words before submitting.'); } });
+</script>
+{% endblock %}

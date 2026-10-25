@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}AI practice · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="ai-section">
+    <div class="container">
+        <div class="page-heading">
+            <div><p class="eyebrow">AI practice studio</p><h1>Practice with an AI examiner.</h1><p>Speak naturally or submit an essay and receive structured IELTS-style feedback.</p></div>
+            <a class="text-link" href="{{ url_for('main.dashboard') }}">← Dashboard</a>
+        </div>
+
+        <div class="ai-notice"><span class="instruction-icon">✦</span><div><strong>AI feedback is for practice, not an official IELTS result.</strong><p>Speaking uses your microphone and AI transcription. Writing feedback follows IELTS criteria and is generated from your essay.</p></div></div>
+
+        <div class="ai-summary-grid">
+            <div class="ai-summary-card"><span class="summary-label">Speaking</span><strong>{{ speaking_attempts }} <small>/ {{ speaking_limit }}</small></strong><span>{{ 'premium' if current_user.is_premium else 'free' }} AI mocks used</span></div>
+            <div class="ai-summary-card"><span class="summary-label">Writing</span><strong>{{ writing_attempts }} <small>/ {{ writing_limit }}</small></strong><span>{{ 'premium' if current_user.is_premium else 'free' }} AI checkers used</span></div>
+            <div class="ai-summary-card ai-summary-highlight"><span class="summary-label">Your plan</span><strong>{% if current_user.is_premium %}Premium{% else %}Free{% endif %}</strong><span>{% if current_user.is_premium %}10 per AI skill{% else %}2 per AI skill{% endif %}</span></div>
+        </div>
+
+        {% set ns = namespace(last_skill='') %}
+        <div class="ai-mock-list">
+            {% for mock in mocks %}
+                {% if mock.skill != ns.last_skill %}
+                    {% set ns.last_skill = mock.skill %}
+                    <div class="ai-list-heading"><div><p class="eyebrow">AI {{ mock.skill|capitalize }}</p><h2>{% if mock.skill == 'speaking' %}Speaking examiner{% else %}Writing checker{% endif %}</h2></div><span>{% if mock.skill == 'speaking' %}AI listens, asks, and evaluates{% else %}AI checks your complete essay{% endif %}</span></div>
+                {% endif %}
+                <article class="ai-mock-card {% if mock.locked %}is-locked{% endif %}">
+                    <div class="ai-mock-icon {{ mock.skill }}-icon">{{ 'S' if mock.skill == 'speaking' else 'W' }}</div>
+                    <div class="ai-mock-main"><div class="ai-mock-card-top"><span class="skill-tag skill-tag-{{ 'reading' if mock.skill == 'writing' else 'listening' }}">{{ mock.skill }}</span>{% if mock.locked %}<span class="ai-locked-label">{% if current_user.is_premium %}Premium limit reached{% else %}Premium access{% endif %}</span>{% elif current_user.is_premium %}<span class="premium-inline">Premium access</span>{% else %}<span class="mock-count">{{ mock.remaining }} free left</span>{% endif %}</div><h3>{{ mock.title }}</h3><p>{{ mock.description }}</p><span class="ai-mock-meta">⏱ {{ mock.time_limit_minutes }} minutes · AI feedback</span></div>
+                    <div class="ai-mock-action">{% if not mock.locked %}<a class="button button-small" href="{{ url_for('ai.speaking' if mock.skill == 'speaking' else 'ai.writing', mock_id=mock.id) }}">{% if mock.skill == 'speaking' %}Start speaking{% else %}Start writing{% endif %} →</a>{% else %}<span class="ai-locked-copy">{% if current_user.is_premium %}You have used all 10{% else %}Upgrade to unlock{% endif %}</span>{% endif %}</div>
+                </article>
+            {% else %}
+                <div class="empty-state"><h2>No AI mocks published yet.</h2><p>Run the AI content seed command to add them.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

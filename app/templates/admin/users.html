@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Manage users · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="admin-section">
+    <div class="container">
+        <div class="page-heading admin-heading"><div><p class="eyebrow">Administration / Access</p><h1>Users</h1><p>Manage premium access for students. Passwords are securely stored and never displayed.</p></div><a class="button button-outline" href="{{ url_for('admin.index') }}">← Dashboard</a></div>
+        {% if users %}
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead><tr><th>User</th><th>Joined</th><th>Role</th><th>Premium access</th><th></th></tr></thead>
+                    <tbody>
+                        {% for user in users %}
+                            <tr>
+                                <td><strong>{{ user.name }}</strong><span>{{ user.email }}</span></td>
+                                <td>{{ user.created_at }}</td>
+                                <td>{% if user.is_admin %}<span class="admin-badge badge-admin">Admin</span>{% else %}<span class="admin-badge">Student</span>{% endif %}</td>
+                                <td>{% if user.is_premium %}<span class="status-badge status-published">Premium</span>{% else %}<span class="status-badge status-draft">Free</span>{% endif %}</td>
+                                <td class="table-action">{% if not user.is_admin %}<form method="post" action="{{ url_for('admin.toggle_premium', user_id=user.id) }}"><button class="button button-small button-outline" type="submit">{% if user.is_premium %}Remove premium{% else %}Give premium{% endif %}</button></form>{% else %}<span class="admin-muted">Admin account</span>{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}<div class="empty-state"><h2>No users yet</h2><p>Student accounts will appear here after registration.</p></div>{% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -551,3 +551,8 @@ def seed_demo_content():
                 question_number += len(section_questions)
 
     db.commit()
+
+    # Keep one seed command enough for a fresh local installation.
+    from .ai_seed import seed_ai_content
+
+    seed_ai_content()

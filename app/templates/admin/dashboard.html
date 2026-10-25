@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Admin dashboard · IELTS Platform{% endblock %}
+
+{% block content %}
+<section class="admin-section">
+    <div class="container">
+        <div class="page-heading admin-heading">
+            <div>
+                <p class="eyebrow">Administration</p>
+                <h1>Platform overview</h1>
+                <p>Manage your IELTS content and help students get more practice for less.</p>
+            </div>
+            <div class="admin-actions">
+                <a class="button" href="{{ url_for('admin.new_mock') }}">+ New mock</a>
+                <a class="button button-outline" href="{{ url_for('admin.users') }}">Manage users</a>
+            </div>
+        </div>
+
+        <div class="admin-grid admin-stat-grid">
+            <div class="admin-card admin-stat"><span>Registered users</span><strong>{{ counts.users }}</strong></div>
+            <div class="admin-card admin-stat"><span>Premium users</span><strong>{{ counts.premium_users }}</strong></div>
+            <div class="admin-card admin-stat"><span>Published mocks</span><strong>{{ counts.published_mocks }} <small>/ {{ counts.mocks }}</small></strong></div>
+            <div class="admin-card admin-stat"><span>Completed attempts</span><strong>{{ counts.attempts }}</strong></div>
+        </div>
+
+        <div class="admin-two-column">
+            <section class="admin-card">
+                <div class="admin-card-heading"><div><p class="eyebrow">Content</p><h2>Mock tests</h2></div><a class="text-link" href="{{ url_for('admin.mocks') }}">View all →</a></div>
+                <p class="admin-muted">Create drafts, add passages or listening sections, write questions, and publish when the mock is ready.</p>
+                <a class="button button-small" href="{{ url_for('admin.new_mock') }}">Create a draft</a>
+            </section>
+            <section class="admin-card">
+                <div class="admin-card-heading"><div><p class="eyebrow">Access</p><h2>Premium management</h2></div><a class="text-link" href="{{ url_for('admin.users') }}">View users →</a></div>
+                <p class="admin-muted">Give a student premium access after payment or remove it when needed. Passwords are never shown here.</p>
+                <a class="button button-small" href="{{ url_for('admin.users') }}">Open user list</a>
+            </section>
+        </div>
+
+        <div class="admin-two-column admin-lower-grid">
+            <section class="admin-card">
+                <div class="admin-card-heading"><div><p class="eyebrow">Latest</p><h2>Recent users</h2></div></div>
+                {% if recent_users %}
+                    <div class="admin-list">
+                        {% for user in recent_users %}
+                            <div class="admin-list-row"><div><strong>{{ user.name }}</strong><span>{{ user.email }}</span></div><span class="admin-badge {% if user.is_premium %}badge-premium{% endif %}">{% if user.is_admin %}Admin{% elif user.is_premium %}Premium{% else %}Free{% endif %}</span></div>
+                        {% endfor %}
+                    </div>
+                {% else %}<p class="admin-muted">No users yet.</p>{% endif %}
+            </section>
+            <section class="admin-card">
+                <div class="admin-card-heading"><div><p class="eyebrow">Activity</p><h2>Recent attempts</h2></div></div>
+                {% if recent_attempts %}
+                    <div class="admin-list">
+                        {% for attempt in recent_attempts %}
+                            <div class="admin-list-row"><div><strong>{{ attempt.name }}</strong><span>{{ attempt.title }}</span></div><span class="admin-score">{{ attempt.score }}/{{ attempt.total_points }}</span></div>
+                        {% endfor %}
+                    </div>
+                {% else %}<p class="admin-muted">No completed attempts yet.</p>{% endif %}
+            </section>
+        </div>
+    </div>
+</section>
+{% endblock %}
