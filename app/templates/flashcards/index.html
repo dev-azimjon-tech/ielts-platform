@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Flashcards · IELTS Platform{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/flashcards.css') }}">{% endblock %}
+{% block content %}
+<section class="vocab-section">
+    <div class="container">
+        <div class="page-heading">
+            <div><p class="eyebrow">Your vocabulary</p><h1>Words worth remembering.</h1><p>Build your own collection. Learn with flashcards, then test what sticks.</p></div>
+        </div>
+        <div class="vocab-overview">
+            <div class="vocab-total"><span class="vocab-stack-icon" aria-hidden="true">Aa</span><div><strong>{{ words|length }}</strong><span>{{ 'word' if words|length == 1 else 'words' }} saved</span></div></div>
+            <div class="vocab-practice-actions"><a class="button button-outline" href="{{ url_for('learning.review') }}">Review due cards ({{ review_summary.due }})</a>
+                {% if words %}<a class="button button-outline" href="{{ url_for('flashcards.study') }}">Study flashcards <span aria-hidden="true">↗</span></a>{% else %}<button class="button button-outline" type="button" disabled>Study flashcards</button>{% endif %}
+                <form method="post" action="{{ url_for('flashcards.start_quiz') }}">
+                    <input type="hidden" name="csrf_token" value="{{ flashcards_csrf_token }}">
+                    <button class="button" type="submit"{% if not can_quiz %} disabled aria-describedby="quiz-help"{% endif %}>Multiple-choice quiz <span aria-hidden="true">→</span></button>
+                </form>
+            </div>
+            <p id="quiz-help" class="vocab-quiz-hint">{% if can_quiz %}Your next quiz has {{ quiz_size }} questions. All answer choices come from your own vocabulary.{% else %}Save at least 2 words with different meanings to unlock your quiz.{% endif %}</p>
+        </div>
+        <p class="vocab-quiz-hint">{{ review_summary.new }} new · {{ review_summary.scheduled }} scheduled for later · {{ review_summary.reviewed_today }} reviewed today{% if review_summary.next_due %} · Next review day: {{ review_summary.next_due }}{% endif %}</p>
+        <div class="vocab-layout">
+            <aside class="vocab-add-card">
+                <p class="eyebrow">One word at a time</p><h2>Add a new word</h2>
+                <p class="vocab-muted">Found a useful word in a passage? Give it a place to stay.</p>
+                <form class="vocab-form" method="post" action="{{ url_for('flashcards.add_word') }}">
+                    {% include "flashcards/_word_fields.html" %}
+                    <button class="button button-full" type="submit">Save word <span aria-hidden="true">+</span></button>
+                </form>
+            </aside>
+            <div class="vocab-collection">
+                <div class="dashboard-section-heading compact-heading"><div><p class="eyebrow">Personal collection</p><h2>Your flashcards</h2></div><span class="vocab-muted">Only you can see these words.</span></div>
+                {% if words %}
+                    <div class="vocab-grid">
+                        {% for word in words %}
+                        <article class="vocab-word-card">
+                            <span class="vocab-card-label">Word {{ loop.index }}</span>
+                            <p class="vocab-quiz-hint">{{ word.review_label }}</p><h3>{{ word.term }}</h3><p class="vocab-meaning">{{ word.meaning }}</p>
+                            {% if word.example %}<p class="vocab-example">{{ word.example }}</p>{% endif %}
+                            <div class="vocab-word-actions">
+                                <a class="text-link" href="{{ url_for('flashcards.edit_word', word_id=word.id) }}" aria-label="Edit {{ word.term }}">Edit card</a>
+                                <details class="vocab-delete">
+                                    <summary aria-label="Delete {{ word.term }}">Delete</summary>
+                                    <form method="post" action="{{ url_for('flashcards.delete_word', word_id=word.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ flashcards_csrf_token }}">
+                                        <p>Remove this word from your collection?</p><button class="button button-small button-danger" type="submit">Delete word</button>
+                                    </form>
+                                </details>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="vocab-empty"><span class="vocab-empty-icon" aria-hidden="true">Aa</span><h3>A little vocabulary, every day.</h3><p>Save your first word and its meaning using the form. Your flashcards will appear here, ready to study.</p></div>
+                {% endif %}
+                {% if recent_quizzes %}
+                    <section class="vocab-history">
+                        <p class="eyebrow">See what sticks</p><h2>Recent vocabulary quizzes</h2>
+                        {% for quiz in recent_quizzes %}<a class="vocab-history-row" href="{{ url_for('flashcards.quiz', quiz_id=quiz.id) }}"><span><strong>Vocabulary quiz</strong><small>{{ quiz.completed_at[:16] }} UTC</small></span><strong>{{ quiz.score }} / {{ quiz.total }} <span aria-hidden="true">→</span></strong></a>{% endfor %}
+                    </section>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

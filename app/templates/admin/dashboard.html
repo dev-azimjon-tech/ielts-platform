@@ -1,8 +1,8 @@
-{% extends "base.html" %}
+{% extends "admin/base.html" %}
 
 {% block title %}Admin dashboard · IELTS Platform{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <section class="admin-section">
     <div class="container">
         <div class="page-heading admin-heading">
@@ -18,13 +18,22 @@
         </div>
 
         <div class="admin-grid admin-stat-grid">
-            <div class="admin-card admin-stat"><span>Registered users</span><strong>{{ counts.users }}</strong></div>
-            <div class="admin-card admin-stat"><span>Premium users</span><strong>{{ counts.premium_users }}</strong></div>
-            <div class="admin-card admin-stat"><span>Published mocks</span><strong>{{ counts.published_mocks }} <small>/ {{ counts.mocks }}</small></strong></div>
-            <div class="admin-card admin-stat"><span>Completed attempts</span><strong>{{ counts.attempts }}</strong></div>
+            <div class="admin-card admin-stat"><span>Registered users</span><strong>{{ counts.users }}</strong><small>{{ counts.new_users }} joined in the last 7 days</small></div>
+            <div class="admin-card admin-stat"><span>Premium students</span><strong>{{ counts.premium_users }}</strong></div>
+            <div class="admin-card admin-stat"><span>Reading & Listening live</span><strong>{{ counts.published_mocks }} <small>/ {{ counts.mocks }}</small></strong></div>
+            <div class="admin-card admin-stat"><span>Completed attempts</span><strong>{{ counts.attempts }}</strong><small>Reading, Listening, Speaking & Writing</small></div>
         </div>
 
-        <div class="admin-two-column">
+        <div class="admin-operations-grid">
+            <section class="admin-card"><div class="admin-card-heading"><div><p class="eyebrow">Continue building</p><h2>Drafts to finish</h2></div><a class="text-link" href="{{ url_for('admin.mocks', status='draft') }}">All drafts →</a></div>
+                {% if drafts %}<div class="admin-list">{% for mock in drafts %}<a class="admin-list-row admin-draft-row" href="{{ url_for('admin.edit_mock', mock_id=mock.id) }}"><div><strong>{{ mock.title }}</strong><span>{{ mock.skill|capitalize }} · {{ mock.question_count }} questions</span></div><span class="admin-score">Continue →</span></a>{% endfor %}</div>{% else %}<p class="admin-muted">No unfinished drafts. Create a new mock when you are ready.</p>{% endif %}
+            </section>
+            <section class="admin-card"><div class="admin-card-heading"><div><p class="eyebrow">Learning activity</p><h2>Practice across the platform</h2></div></div>
+                <div class="admin-activity-grid">{% for skill in ['reading', 'listening', 'speaking', 'writing'] %}<div><span class="skill-icon {{ skill }}-icon">{{ skill[0]|upper }}</span><span>{{ skill|capitalize }}</span><strong>{{ activity.get(skill, 0) }}</strong><small>completed</small></div>{% endfor %}</div>
+                <div class="admin-activity-note"><span>{{ counts.published_ai }} AI mocks live</span><span>{{ counts.vocabulary_words }} vocabulary cards · {{ counts.vocabulary_quizzes }} quizzes completed</span></div>
+            </section>
+        </div>
+        <div class="admin-two-column admin-lower-grid">
             <section class="admin-card">
                 <div class="admin-card-heading"><div><p class="eyebrow">Content</p><h2>Mock tests</h2></div><a class="text-link" href="{{ url_for('admin.mocks') }}">View all →</a></div>
                 <p class="admin-muted">Create drafts, add passages or listening sections, write questions, and publish when the mock is ready.</p>
@@ -43,7 +52,7 @@
                 {% if recent_users %}
                     <div class="admin-list">
                         {% for user in recent_users %}
-                            <div class="admin-list-row"><div><strong>{{ user.name }}</strong><span>{{ user.email }}</span></div><span class="admin-badge {% if user.is_premium %}badge-premium{% endif %}">{% if user.is_admin %}Admin{% elif user.is_premium %}Premium{% else %}Free{% endif %}</span></div>
+                            <div class="admin-list-row"><div><strong>{{ user.name }}</strong><span>{{ user.email }}</span></div><span class="admin-badge {% if user.is_admin %}badge-admin{% elif user.is_premium %}badge-premium{% endif %}">{% if user.is_admin %}Admin{% elif user.is_premium %}Premium{% else %}Free{% endif %}</span></div>
                         {% endfor %}
                     </div>
                 {% else %}<p class="admin-muted">No users yet.</p>{% endif %}
@@ -53,7 +62,7 @@
                 {% if recent_attempts %}
                     <div class="admin-list">
                         {% for attempt in recent_attempts %}
-                            <div class="admin-list-row"><div><strong>{{ attempt.name }}</strong><span>{{ attempt.title }}</span></div><span class="admin-score">{{ attempt.score }}/{{ attempt.total_points }}</span></div>
+                            <div class="admin-list-row"><div><strong>{{ attempt.name }}</strong><span>{{ attempt.skill|capitalize }} · {{ attempt.title }}</span><small class="admin-muted">{{ attempt.completed_at[:16] }} UTC</small></div><span class="admin-score">{{ attempt.score }}/{{ attempt.total_points }}</span></div>
                         {% endfor %}
                     </div>
                 {% else %}<p class="admin-muted">No completed attempts yet.</p>{% endif %}

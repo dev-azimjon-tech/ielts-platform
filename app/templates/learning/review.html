@@ -1,0 +1,46 @@
+{% extends 'learning/base.html' %}
+{% block title %}Daily vocabulary review · IELTS{% endblock %}
+{% block learning %}
+<p class="eyebrow">A little vocabulary, every day</p>
+<h1>Vocabulary due today</h1>
+<p>Recall the meaning before revealing the answer, then choose how well you remembered it.</p>
+<div class="review-summary" aria-label="Your vocabulary review progress">
+    <div><strong>{{ summary.due }}</strong><span>cards due</span></div>
+    <div><strong>{{ summary.new }}</strong><span>new cards</span></div>
+    <div><strong>{{ summary.reviewed_today }}</strong><span>cards reviewed today</span></div>
+    <div><strong>{{ summary.scheduled }}</strong><span>scheduled for later</span></div>
+</div>
+<article class="learn-card review-study-card">
+    {% if word %}
+        <p class="eyebrow">{{ 'New word' if word.due_on is none else 'Recall practice' }}</p>
+        <h2>{{ word.term }}</h2>
+        <p>What does this word or phrase mean?</p>
+        <details>
+            <summary>Reveal meaning and rate recall</summary>
+            <div class="review-meaning"><p>{{ word.meaning }}</p>{% if word.example %}<p class="review-example">{{ word.example }}</p>{% endif %}</div>
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ learning_csrf }}">
+                <input type="hidden" name="word_id" value="{{ word.id }}">
+                <div class="review-ratings">
+                    {% for option in options %}
+                    <button class="button {{ 'button-outline' if option.rating == 'again' else '' }}" name="rating" value="{{ option.rating }}" title="Next review: {{ option.due_on }}">
+                        <span>{{ option.rating|capitalize }}</span><small>{{ option.label }}</small>
+                    </button>
+                    {% endfor %}
+                </div>
+            </form>
+            <p class="review-help">Again brings this card back after the other due cards. Good and Easy give you more time before the next review.</p>
+        </details>
+    {% elif summary.total %}
+        <p class="eyebrow">Today's review complete</p>
+        <h2>All caught up</h2>
+        <p>Your {{ summary.total }} saved {{ 'word is' if summary.total == 1 else 'words are' }} scheduled for later.</p>
+        {% if summary.next_due %}<p>Your next review day is <strong><time datetime="{{ summary.next_due }}">{{ summary.next_due }}</time></strong>.</p>{% endif %}
+        <a class="button button-outline" href="{{ url_for('flashcards.study') }}">Keep practising all cards</a>
+    {% else %}
+        <h2>Add your first word</h2>
+        <p>Save vocabulary with its meaning to start your daily review. New words are ready to review immediately.</p>
+    {% endif %}
+    <div class="learn-actions"><a href="{{ url_for('flashcards.index') }}">Your vocabulary library →</a></div>
+</article>
+{% endblock %}

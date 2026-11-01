@@ -3,13 +3,17 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     <title>{% block title %}IELTS Platform{% endblock %}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    {% if not exam_mode %}<link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">{% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% if exam_mode %} class="exam-mode"{% endif %}>
+    {% block header %}
     <header class="site-header">
         <div class="container nav-wrapper">
             <a class="brand" href="{{ url_for('main.index') }}" aria-label="IELTS Platform home">
@@ -17,14 +21,19 @@
                 <span>IELTS<span class="brand-accent">.</span></span>
             </a>
             <nav class="site-nav" aria-label="Main navigation">
+                {% include "_theme_toggle.html" %}
+                <a href="{{ url_for('main.guide') }}"{% if request.endpoint == 'main.guide' %} aria-current="page"{% endif %}>Video guide</a>
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
                     <a href="{{ url_for('mocks.index') }}">Mocks</a>
+                    <a href="{{ url_for('learning.index') }}">Learning hub</a>
                     <a href="{{ url_for('ai.index') }}">AI practice</a>
+                    <a href="{{ url_for('flashcards.index') }}"{% if request.blueprint == 'flashcards' %} aria-current="page"{% endif %}>Flashcards</a>
                     {% if current_user.is_admin %}
                         <a href="{{ url_for('admin.index') }}">Admin</a>
                     {% endif %}
                     <form class="logout-form" method="post" action="{{ url_for('auth.logout') }}">
+                        <input type="hidden" name="csrf_token" value="{{ app_csrf_token }}">
                         <button class="nav-button" type="submit">Log out</button>
                     </form>
                 {% else %}
@@ -35,8 +44,23 @@
             </nav>
         </div>
     </header>
+    {% endblock %}
 
     <main>
+        {% if exam_session %}
+        <div class="container exam-session-banner" data-exam-deadline="{{ exam_deadline }}" style="padding:16px">
+            <strong>Exam · Section {{ exam_session.stage+1 }}/4</strong> · Time left: <output aria-live="off">—</output>
+            · <a href="{{ url_for('learning.exam') }}">Session details</a>
+            <p id="exam-save-status" role="status">Your answers save to this session.</p>
+            <p id="exam-timer-status" role="status"></p>
+            <form method="post" action="{{ url_for('learning.exam_skip',session_id=exam_session.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ learning_csrf }}"><input type="hidden" name="stage" value="{{ exam_session.stage }}">
+                <details><summary>Unable to finish this section?</summary><p>You can continue without a score. The report keeps your last saved draft.</p><button class="button button-outline button-small">End this section without a score</button></details>
+            </form>
+        </div>
+        <script type="application/json" id="exam-config">{{ {'session':exam_session.id,'stage':exam_session.stage,'serverNow':exam_server_now,'autoSubmit':exam_auto_submit,'deadline':exam_deadline,'draft':exam_draft,'revision':exam_revision,'csrf':learning_csrf,'restore':request.method=='GET','draftUrl':url_for('learning.exam_draft',session_id=exam_session.id)}|tojson }}</script>
+        <script src="{{ url_for('static',filename='js/exam-session.js') }}" defer></script>
+        {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="container flash-stack" aria-live="polite">
@@ -49,11 +73,13 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="site-footer">
+    {% block footer %}<footer class="site-footer">
         <div class="container footer-inner">
             <span>IELTS Platform</span>
+            <a href="{{ url_for('main.guide') }}">Help &amp; video guide</a>
             <span>Affordable preparation for every learner.</span>
         </div>
-    </footer>
+    </footer>{% endblock %}
+    {% block scripts %}{% endblock %}
 </body>
 </html>

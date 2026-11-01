@@ -1,0 +1,13 @@
+<input type="hidden" name="csrf_token" value="{{ flashcards_csrf_token }}">
+<div class="field">
+    <label for="vocab-term">Word or phrase</label>
+    <input id="vocab-term" name="term" value="{{ values.get('term', '') }}" maxlength="100" placeholder="e.g. resilient" required>
+</div>
+<div class="field">
+    <label for="vocab-meaning">Meaning or translation</label>
+    <textarea id="vocab-meaning" name="meaning" rows="3" maxlength="500" placeholder="Able to recover quickly from difficulties" required>{{ values.get('meaning', '') }}</textarea>
+</div>
+<div class="field">
+    <label for="vocab-example">Example sentence <span class="field-help">(optional)</span></label>
+    <textarea id="vocab-example" name="example" rows="3" maxlength="1000" placeholder="A resilient community adapts to change.">{{ values.get('example', '') }}</textarea>
+</div>

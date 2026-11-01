@@ -1,0 +1,20 @@
+.speaking-review-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.speaking-review-help{color:var(--muted);font-size:.9rem;line-height:1.6}
+.speaking-playback-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:16px 0}
+.speaking-playback-toolbar select{padding:8px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--field-bg);color:var(--ink);font:inherit}
+.speaking-part-nav,.speaking-result-nav{display:flex;gap:16px;flex-wrap:wrap;margin:20px 0}
+.speaking-part-nav a{padding:8px 14px;background:var(--soft-green);border:1px solid var(--line);border-radius:20px}
+.speaking-part-heading{scroll-margin-top:24px;margin:32px 0 20px}
+.speaking-answer{border:1px solid var(--line);border-radius:16px;padding:24px;margin:18px 0;background:var(--field-bg);overflow-wrap:anywhere}
+.speaking-answer-heading{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+.speaking-answer-heading h4{font-size:1.05rem;line-height:1.6;margin:0}.speaking-answer-number{flex:none;font-weight:700;color:var(--green)}
+.speaking-answer audio{display:block;width:100%;margin:16px 0}
+.speaking-audio-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:18px 0}
+.speaking-loop-label{display:flex;align-items:center;gap:8px;font-size:.9rem}.speaking-loop-label input{accent-color:var(--green);width:17px;height:17px}
+.speaking-answer-transcript{padding:20px 0 0;border-top:1px solid var(--line);margin-top:20px}
+.speaking-answer-transcript p,.speaking-plain-transcript{white-space:pre-wrap;line-height:1.8}
+.speaking-delete{margin-top:16px;font-size:.9rem}.speaking-delete summary{cursor:pointer;color:var(--muted)}.speaking-delete form{margin:16px 0 0}
+.speaking-audio-error{padding:14px;border-radius:10px;background:var(--warning-bg);color:var(--warning)}
+.speaking-audio-unavailable{color:var(--muted);font-size:.9rem}.speaking-playback-status{color:var(--muted);font-size:.9rem}
+.speaking-result-nav{justify-content:space-between;border-top:1px solid var(--line);padding-top:20px}
+@media(max-width:500px){.speaking-answer{padding:16px}.speaking-audio-actions{gap:12px}.speaking-playback-toolbar>p{margin:0}}

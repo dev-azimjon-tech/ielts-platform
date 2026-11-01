@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Study flashcards · IELTS Platform{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/flashcards.css') }}">{% endblock %}
+{% block content %}
+<section class="vocab-section"><div class="container vocab-study-shell">
+    <a class="back-link" href="{{ url_for('flashcards.index') }}">← Your vocabulary</a>
+    <div class="page-heading"><div><p class="eyebrow">A little practice goes a long way</p><h1>Meet your words again.</h1><p>Try to recall the meaning before you reveal it.</p></div></div>
+    <div class="vocab-study-progress"><span id="study-progress" role="status">Card 1 of {{ words|length }}</span><button id="shuffle-cards" class="button button-small button-outline" type="button" hidden>Shuffle cards</button></div>
+    <progress id="study-progress-bar" class="vocab-progress" value="1" max="{{ words|length }}" aria-label="Current flashcard"></progress>
+    <details id="study-card" class="vocab-study-card">
+        <summary><span class="vocab-card-label">What does this mean?</span><strong id="study-term">{{ words[0].term }}</strong><span class="vocab-reveal-label"><span class="vocab-show-label">Reveal meaning</span><span class="vocab-hide-label">Hide meaning</span> <span aria-hidden="true">↕</span></span></summary>
+        <div class="vocab-study-answer"><span class="vocab-card-label">Meaning</span><p id="study-meaning">{{ words[0].meaning }}</p><p id="study-example" class="vocab-example"{% if not words[0].example %} hidden{% endif %}>{{ words[0].example }}</p></div>
+    </details>
+    <div id="study-controls" class="vocab-study-controls" hidden><button id="previous-card" class="button button-outline" type="button" disabled>← Previous</button><button id="next-card" class="button" type="button">{% if words|length == 1 %}Start again{% else %}Next card →{% endif %}</button></div>
+    <p class="vocab-study-tip">Select the card or focus it and press Enter to reveal the meaning.</p>
+    <noscript><p class="flash flash-info">Enable JavaScript to move between cards, or <a href="{{ url_for('flashcards.index') }}">review your full collection</a>.</p></noscript>
+    <div class="vocab-study-quiz">
+        {% if can_quiz %}<span>Ready to put your memory to work?</span><form method="post" action="{{ url_for('flashcards.start_quiz') }}"><input type="hidden" name="csrf_token" value="{{ flashcards_csrf_token }}"><button class="text-link" type="submit">Start a vocabulary quiz →</button></form>
+        {% else %}<span>Save at least 2 words with different meanings to try a quiz.</span><a class="text-link" href="{{ url_for('flashcards.index') }}">Add more words →</a>{% endif %}
+    </div>
+</div></section>
+<script id="flashcard-data" type="application/json">{{ words|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/flashcards.js') }}" defer></script>{% endblock %}

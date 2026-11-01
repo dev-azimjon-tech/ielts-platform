@@ -1,7 +1,8 @@
 import re
 import sqlite3
+from urllib.parse import urlsplit
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -11,6 +12,21 @@ from ..models import User
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def _login_destination():
+    target = request.form.get('next') or request.args.get('next', '')
+    if target.startswith('/') and not target.startswith('//') and len(target) <= 2048 and '\\' not in target and not any(ord(c)<32 or ord(c)==127 for c in target):
+        parsed = urlsplit(target)
+        if not parsed.scheme and not parsed.netloc:
+            return target
+    return url_for('main.dashboard')
+
+
+def _sign_in(user):
+    # Drop state belonging to any prior account before establishing this login.
+    session.clear()
+    login_user(user)
 
 
 @auth_bp.route("/register", methods=("GET", "POST"))
@@ -44,7 +60,7 @@ def register():
             except sqlite3.IntegrityError:
                 error = "An account with that email already exists."
             else:
-                login_user(user)
+                _sign_in(user)
                 flash("Your account has been created. Welcome to IELTS Platform!", "success")
                 return redirect(url_for("main.dashboard"))
 
@@ -66,9 +82,9 @@ def login():
         if user is None or not check_password_hash(user.password_hash, password):
             flash("Email or password is incorrect.", "error")
         else:
-            login_user(user)
+            _sign_in(user)
             flash(f"Welcome back, {user.name}!", "success")
-            return redirect(url_for("main.dashboard"))
+            return redirect(_login_destination())
 
     return render_template("auth/login.html")
 
@@ -93,7 +109,7 @@ def admin_login():
         ):
             flash("Admin username or password is incorrect.", "error")
         else:
-            login_user(user)
+            _sign_in(user)
             flash("Welcome to the admin panel.", "success")
             return redirect(url_for("admin.index"))
 
@@ -104,5 +120,6 @@ def admin_login():
 @login_required
 def logout():
     logout_user()
+    session.clear()
     flash("You have been logged out.", "success")
     return redirect(url_for("main.index"))

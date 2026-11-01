@@ -1,8 +1,8 @@
-{% extends "base.html" %}
+{% extends "admin/base.html" %}
 
 {% block title %}{% if editing %}Edit mock{% else %}New mock{% endif %} · IELTS Platform{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <section class="admin-section">
     <div class="container admin-narrow">
         <a class="back-link" href="{% if editing %}{{ url_for('admin.edit_mock', mock_id=mock.id) }}{% else %}{{ url_for('admin.mocks') }}{% endif %}">← Back to admin</a>
@@ -10,7 +10,7 @@
             <p class="eyebrow">{{ 'Edit mock details' if editing else 'Create a draft' }}</p>
             <h1>{{ 'Edit mock details' if editing else 'New mock test' }}</h1>
             <p class="admin-muted">Set the basic information first. You can add passages, sections, and questions on the next screen.</p>
-            <form class="admin-form" method="post">
+            <form class="admin-form" method="post"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
                 <div class="form-row">
                     <div class="field"><label for="skill">Skill</label><select id="skill" name="skill" required><option value="reading" {% if values.skill == 'reading' %}selected{% endif %}>Reading</option><option value="listening" {% if values.skill == 'listening' %}selected{% endif %}>Listening</option></select></div>
                     <div class="field"><label for="time_limit_minutes">Time limit (minutes)</label><input id="time_limit_minutes" name="time_limit_minutes" type="number" min="1" max="300" value="{{ values.time_limit_minutes }}" required></div>

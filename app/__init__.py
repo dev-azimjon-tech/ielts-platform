@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -17,8 +18,12 @@ def create_app(test_config=None):
     load_dotenv()
 
     app = Flask(__name__, instance_relative_config=True)
+    configured_secret = os.getenv('SECRET_KEY')
+    if configured_secret in (None, '', 'dev-only-change-this-secret', 'replace-this-with-a-long-random-value'):
+        configured_secret = secrets.token_hex(32)
     app.config.from_mapping(
-        SECRET_KEY=os.getenv("SECRET_KEY", "dev-only-change-this-secret"),
+        SECRET_KEY=configured_secret,
+        SESSION_COOKIE_SAMESITE="Lax",
         OLLAMA_HOST=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         OLLAMA_TEXT_MODEL=os.getenv("OLLAMA_TEXT_MODEL", "llama3.2:3b"),
         WHISPER_MODEL=os.getenv("WHISPER_MODEL", "base.en"),
@@ -40,6 +45,8 @@ def create_app(test_config=None):
         database_parent.mkdir(parents=True, exist_ok=True)
 
     init_app(app)
+    from .security import init_app as init_security
+    init_security(app)
 
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
@@ -55,11 +62,15 @@ def create_app(test_config=None):
     from .ai import ai_bp
     from .main import main_bp
     from .mocks import mocks_bp
+    from .flashcards import flashcards_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(ai_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(mocks_bp)
+    app.register_blueprint(flashcards_bp)
+    from .learning import learning_bp
+    app.register_blueprint(learning_bp)
 
     return app

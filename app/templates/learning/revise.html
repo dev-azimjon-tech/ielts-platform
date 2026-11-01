@@ -1,0 +1,51 @@
+{% extends 'learning/base.html' %}
+{% block title %}Writing revisions · IELTS{% endblock %}
+{% block learning %}
+<a class="back-link" href="{{ url_for('ai.result',attempt_id=original.id) }}">← Original Writing result</a>
+<p class="eyebrow">Learn, revise, compare</p><h1>Revise your Writing response</h1>
+<p>{{ original.title }} · {{ remaining }} Writing AI {{ 'check' if remaining==1 else 'checks' }} left. Draft saves are free; each successful revision check uses one allowance.</p>
+<details class="learn-card revision-task"><summary>Review the Writing task</summary><h2>{{ task.prompt }}</h2><p>{{ task.instructions }}</p><p>Aim for {{ task.minimum_words|default(250) }} words.</p></details>
+<div class="revision-workspace">
+    <aside class="learn-card revision-feedback">
+        <p class="eyebrow">Feedback to work on</p><h2>{{ latest.label }} · {{ latest.band }}/9</h2>
+        <p>{{ latest.feedback.feedback|default('Open the original result to review your response.') }}</p>
+        <h3>Next improvements</h3><ul>{% for item in latest.feedback.improvements|default([]) %}<li>{{ item }}</li>{% else %}<li>Review the task, paragraph organisation, vocabulary, and grammar as you revise.</li>{% endfor %}</ul>
+        {% if latest.feedback.strengths %}<details><summary>Keep these strengths</summary><ul>{% for item in latest.feedback.strengths %}<li>{{ item }}</li>{% endfor %}</ul></details>{% endif %}
+        <p class="review-help">AI bands are practice estimates. Use the specific feedback to decide what to improve.</p>
+    </aside>
+    <section class="learn-card revision-editor-card">
+        <h2>Continue your draft</h2>
+        <p>Your latest saved edits appear here. Comparing older versions below leaves this draft in place.</p>
+        <form method="post" id="revision-form" data-draft-url="{{ url_for('learning.writing_revision_draft',attempt_id=original.id) }}" data-conflict="{{ 'true' if conflict else 'false' }}" data-saved="{{ 'true' if essay==draft.essay else 'false' }}">
+            <input type="hidden" name="csrf_token" value="{{ learning_csrf }}">
+            <input type="hidden" name="draft_version" id="revision-draft-version" value="{{ editor_version }}">
+            <input type="hidden" name="submission_token" value="{{ submission_token }}">
+            <label for="revision-essay">Revised essay</label>
+            <textarea name="essay" id="revision-essay" rows="20" maxlength="50000" aria-describedby="revision-word-count revision-draft-status">{{ essay }}</textarea>
+            <div class="revision-editor-status"><span id="revision-word-count">{{ word_count }} words</span><span id="revision-draft-status" role="status">{% if conflict %}A newer draft exists in another tab. Copy your text before reloading.{% elif essay==draft.essay %}Draft saved · {{ draft.saved_at }}{% else %}Your current text has not been saved.{% endif %}</span></div>
+            <div class="learn-actions"><button class="button button-outline" name="action" value="save"{% if conflict %} disabled{% endif %}>Save draft</button><button class="button" name="action" value="check"{% if remaining==0 or conflict %} disabled{% endif %}>Check revision with AI</button></div>
+            <p class="review-help">At least 50 words are needed for a feedback check. You can save a shorter or empty draft.</p>
+            <noscript><p>Use Save draft before leaving this page. Automatic saving needs JavaScript.</p></noscript>
+        </form>
+    </section>
+</div>
+<section class="learn-card" id="revision-comparison">
+    <p class="eyebrow">See what changed</p><h2>Compare your versions</h2>
+    <form class="revision-selectors" method="get" action="{{ url_for('learning.revise',attempt_id=original.id) }}#revision-comparison">
+        <label>Earlier version<select name="baseline">{% for version in items %}<option value="{{ version.key }}"{% if version.key==baseline.key %} selected{% endif %}>{{ version.label }} · {{ version.band }}/9</option>{% endfor %}</select></label>
+        <label>Version to compare<select name="revision">{% for version in items %}<option value="{{ version.key }}"{% if version.key==selected.key %} selected{% endif %}>{{ version.label }} · {{ version.band }}/9</option>{% endfor %}</select></label>
+        <button class="button button-outline">Compare</button>
+    </form>
+    <div class="revision-score-summary"><div><span>{{ baseline.label }}</span><strong>{{ baseline.band }}/9</strong></div><div><span>{{ selected.label }}</span><strong>{{ selected.band }}/9</strong></div><div><span>Band change</span><strong>{{ '%+.1f'|format(band_change) }}</strong></div></div>
+    <div class="learn-table"><table><caption>Writing criteria: {{ baseline.label }} compared with {{ selected.label }}</caption><thead><tr><th>Criterion</th><th>{{ baseline.label }}</th><th>{{ selected.label }}</th><th>Change</th></tr></thead><tbody>{% for row in criteria %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.before if row.before is not none else '—' }}</td><td>{{ row.after if row.after is not none else '—' }}</td><td>{{ '%+.1f'|format(row.change) if row.change is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
+    <p class="review-help">A dash means that criterion score was not saved with that version.</p>
+    {% if changes.available %}<p class="revision-change-key"><del>Removed text</del> · <ins>Added text</ins> · {{ changes.removed }} words removed · {{ changes.added }} words added.</p>{% else %}<p>This comparison is too long for change highlighting. Full essays are shown below.</p>{% endif %}
+    <div class="revision-text-grid">
+        <article><h3>{{ baseline.label }} · {{ baseline.essay.split()|length }} words</h3><div class="revision-essay" tabindex="0" aria-label="{{ baseline.label }} essay">{% for segment in changes.before %}{% if segment.kind=='removed' %}<del>{{ segment.text }}</del>{% else %}{{ segment.text }}{% endif %}{% endfor %}</div></article>
+        <article><h3>{{ selected.label }} · {{ selected.essay.split()|length }} words</h3><div class="revision-essay" tabindex="0" aria-label="{{ selected.label }} essay">{% for segment in changes.after %}{% if segment.kind=='added' %}<ins>{{ segment.text }}</ins>{% else %}{{ segment.text }}{% endif %}{% endfor %}</div></article>
+    </div>
+    <details><summary>Feedback for {{ selected.label }}</summary><p>{{ selected.feedback.feedback }}</p><ul>{% for item in selected.feedback.improvements|default([]) %}<li>{{ item }}</li>{% endfor %}</ul></details>
+</section>
+<section class="learn-card"><h2>Your revision history</h2><p>The original essay and all checked revisions stay available. Unchecked drafts appear only in your editor.</p><div class="learn-table"><table><thead><tr><th>Version</th><th>Saved</th><th>Words</th><th>Estimated band</th><th>Compared with original</th></tr></thead><tbody>{% for version in items|reverse %}<tr><td><a href="{{ url_for('learning.revise',attempt_id=original.id,revision=version.key) }}#revision-comparison"{% if version.key==selected.key %} aria-current="true"{% endif %}>{{ version.label }}</a></td><td>{{ version.created_at }}</td><td>{{ version.essay.split()|length }}</td><td>{{ version.band }}/9</td><td>{{ '%+.1f'|format(version.band-original.band_score) }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static',filename='js/writing-revisions.js') }}" defer></script>{% endblock %}

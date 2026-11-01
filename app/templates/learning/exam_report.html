@@ -1,0 +1,13 @@
+{% extends 'learning/base.html' %}
+{% block title %}Exam report · IELTS{% endblock %}
+{% block learning %}
+<a href="{{ url_for('learning.exam') }}">← Exam sessions</a><p class="eyebrow">Your practice report</p><h1>{{ 'Exam complete' if exam.complete else 'Session ended early' if exam.completed_at else 'Exam in progress' }}</h1>
+<p>Started {{ exam.started_at }} · {{ exam.scored_count }} of 4 sections scored.</p>
+{% if exam.overall is not none %}<article class="learn-card"><div class="learn-band">{{ exam.overall }} / 9</div><h2>Estimated overall band</h2><p>The four section estimates are weighted equally and their average is rounded to the nearest half band.</p></article>{% else %}<p>An overall estimate is available after all four sections have scores.</p>{% endif %}
+{% if exam.overtime %}<p>Some sections continued after their time limit. Their bands include work submitted after time ended.</p>{% endif %}
+<div class="learn-grid">{% for item in exam.sections %}{% set stage=loop.index0 %}{% set result=exam.results[stage] if stage<exam.results|length else none %}<article class="learn-card"><p class="eyebrow">Section {{ stage+1 }} · {{ item.minutes }} min</p><h2>{{ item.skill|capitalize }}</h2>
+{% if result and result.band is not none %}<div class="learn-band">{{ result.band }}/9</div>{% if result.overtime %}<p>Submitted after time ended.</p>{% endif %}<a href="{{ url_for('ai.result' if result.kind=='ai' else 'learning.mock_result',attempt_id=result.id) }}">View answers and feedback →</a>{% elif result %}<p>Ended without a score.</p>{% else %}<p>{{ 'Not submitted' if exam.completed_at else 'Current section' if stage==exam.stage else 'Not started' }}</p>{% endif %}
+{% if drafts.get(stage) %}<details><summary>Last saved answers</summary>{% set draft=drafts[stage] %}{% if item.skill=='writing' %}<p class="learn-essay">{{ draft.get('essay','') }}</p>{% elif item.skill=='speaking' %}{% for turn in draft.get('turns',[]) %}<h3>{{ turn.question }}</h3><p>{{ turn.transcript }}</p>{% endfor %}{% else %}<dl>{% for q in draft_questions.get(stage,[]) %}<dt>{{ q.question_number }}. {{ q.prompt }}</dt><dd>{{ q.answer or 'Not answered' }}</dd>{% endfor %}</dl>{% endif %}</details>{% endif %}</article>{% endfor %}</div>
+{% if not exam.completed_at %}<a class="button" href="{{ url_for('learning.exam_continue') }}">Continue session →</a>{% endif %}
+<p class="review-help">Short practice mocks and AI feedback provide estimates. This report does not replace an official IELTS result.</p>
+{% endblock %}

@@ -1,29 +1,40 @@
-{% extends "base.html" %}
+{% extends "admin/base.html" %}
 
 {% block title %}Manage users · IELTS Platform{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <section class="admin-section">
     <div class="container">
         <div class="page-heading admin-heading"><div><p class="eyebrow">Administration / Access</p><h1>Users</h1><p>Manage premium access for students. Passwords are securely stored and never displayed.</p></div><a class="button button-outline" href="{{ url_for('admin.index') }}">← Dashboard</a></div>
+        <form class="admin-filters" method="get" action="{{ url_for('admin.users') }}">
+            <div class="field admin-search"><label for="user-search">Find a user</label><input id="user-search" type="search" name="q" value="{{ q }}" placeholder="Search name or email" maxlength="100"></div>
+            <div class="field"><label for="user-role">Role</label><select id="user-role" name="role"><option value="">All roles</option><option value="student"{% if role == 'student' %} selected{% endif %}>Students</option><option value="admin"{% if role == 'admin' %} selected{% endif %}>Administrators</option></select></div>
+            <div class="field"><label for="user-plan">Plan</label><select id="user-plan" name="plan"><option value="">All plans</option><option value="free"{% if plan == 'free' %} selected{% endif %}>Free</option><option value="premium"{% if plan == 'premium' %} selected{% endif %}>Premium</option></select></div>
+            <button class="button" type="submit">Apply filters</button><a class="text-link" href="{{ url_for('admin.users') }}">Reset</a>
+        </form>
         {% if users %}
             <div class="admin-table-wrap">
                 <table class="admin-table">
-                    <thead><tr><th>User</th><th>Joined</th><th>Role</th><th>Premium access</th><th></th></tr></thead>
+                    <thead><tr><th>User</th><th>Joined</th><th>Role</th><th>Practice</th><th>Premium access</th><th><span class="sr-only">Actions</span></th></tr></thead>
                     <tbody>
                         {% for user in users %}
                             <tr>
                                 <td><strong>{{ user.name }}</strong><span>{{ user.email }}</span></td>
                                 <td>{{ user.created_at }}</td>
                                 <td>{% if user.is_admin %}<span class="admin-badge badge-admin">Admin</span>{% else %}<span class="admin-badge">Student</span>{% endif %}</td>
-                                <td>{% if user.is_premium %}<span class="status-badge status-published">Premium</span>{% else %}<span class="status-badge status-draft">Free</span>{% endif %}</td>
-                                <td class="table-action">{% if not user.is_admin %}<form method="post" action="{{ url_for('admin.toggle_premium', user_id=user.id) }}"><button class="button button-small button-outline" type="submit">{% if user.is_premium %}Remove premium{% else %}Give premium{% endif %}</button></form>{% else %}<span class="admin-muted">Admin account</span>{% endif %}</td>
+                                <td>{{ user.attempts }} completed</td><td>{% if user.is_premium %}<span class="status-badge status-published">Premium</span>{% else %}<span class="status-badge status-draft">Free</span>{% endif %}</td>
+                                <td class="table-action">{% if not user.is_admin %}<details class="admin-access-control"><summary>{{ 'Remove premium' if user.is_premium else 'Give premium' }}</summary><form method="post" action="{{ url_for('admin.set_premium', user_id=user.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><input type="hidden" name="premium" value="{{ 0 if user.is_premium else 1 }}">
+                                    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="role" value="{{ role }}"><input type="hidden" name="plan" value="{{ plan }}"><input type="hidden" name="page" value="{{ pagination.page }}">
+                                    <p>{{ 'Remove premium from' if user.is_premium else 'Enable premium for' }} <strong>{{ user.name }}</strong>?</p><button class="button button-small {{ 'button-danger' if user.is_premium else '' }}" type="submit">Confirm {{ 'removal' if user.is_premium else 'access' }}</button>
+                                </form></details>{% else %}<span class="admin-muted">Admin account</span>{% endif %}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        {% else %}<div class="empty-state"><h2>No users yet</h2><p>Student accounts will appear here after registration.</p></div>{% endif %}
+        {% else %}<div class="empty-state"><h2>No users found</h2><p>{% if q or role or plan %}Try a different search or reset the filters.{% else %}Student accounts will appear here after registration.{% endif %}</p></div>{% endif %}
+        {% include "admin/_pagination.html" %}
     </div>
 </section>
 {% endblock %}

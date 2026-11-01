@@ -1,5 +1,6 @@
 import json
-import tempfile
+import math
+import io
 
 from flask import current_app
 
@@ -36,6 +37,32 @@ def _message_content(response):
     raise AIServiceError("The local AI model returned an empty response.")
 
 
+def _valid_schema(value, schema):
+    """Validate the small JSON-schema subset used by the local AI contracts."""
+    kind = schema.get('type')
+    if kind == 'object':
+        properties = schema.get('properties', {})
+        return (isinstance(value, dict)
+                and all(key in value for key in schema.get('required', []))
+                and (schema.get('additionalProperties') is not False or set(value) <= set(properties))
+                and all(_valid_schema(item, properties[key]) for key, item in value.items() if key in properties))
+    if kind == 'array':
+        return isinstance(value, list) and all(_valid_schema(item, schema['items']) for item in value)
+    if kind == 'string':
+        return isinstance(value, str) and len(value) >= schema.get('minLength', 0) and len(value) <= schema.get('maxLength', math.inf)
+    if kind == 'number':
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and value >= schema.get('minimum', -math.inf) and value <= schema.get('maximum', math.inf) and math.isfinite(value))
+    return False
+
+
+def validated_band(feedback):
+    value = feedback.get('overall_band') if isinstance(feedback, dict) else None
+    if not _valid_schema(value, {'type':'number','minimum':0,'maximum':9}):
+        raise AIServiceError('The local AI returned an invalid band. Your response is preserved; try again.')
+    return float(value)
+
+
 def _json_response(name, system_prompt, user_prompt, schema):
     client = _ollama_client()
     try:
@@ -48,7 +75,10 @@ def _json_response(name, system_prompt, user_prompt, schema):
             format=schema,
             options={"temperature": 0},
         )
-        return json.loads(_message_content(response))
+        result = json.loads(_message_content(response))
+        if not _valid_schema(result, schema):
+            raise AIServiceError('The local AI returned incomplete or invalid feedback. Please try again.')
+        return result
     except AIServiceError:
         raise
     except ConnectionError as error:
@@ -88,6 +118,33 @@ def _whisper_model():
     return cache[cache_key]
 
 
+def _decode_speaking_audio(audio_bytes):
+    """Decode browser formats to Whisper's 16 kHz mono samples across PyAV versions.
+
+    Passing samples bypasses faster-whisper's older av.open(metadata_errors=...)
+    call, which is incompatible with PyAV 19.
+    """
+    import av
+    import numpy as np
+
+    output = io.BytesIO()
+    resampler = av.AudioResampler(format='s16', layout='mono', rate=16000)
+    limit = 16000 * 60 * 10 * 2
+    with av.open(io.BytesIO(audio_bytes), mode='r') as container:
+        for frame in container.decode(audio=0):
+            for converted in resampler.resample(frame):
+                output.write(converted.to_ndarray().tobytes())
+                if output.tell() > limit:
+                    raise AIServiceError('Keep each Speaking answer under 10 minutes.')
+        for converted in resampler.resample(None):
+            output.write(converted.to_ndarray().tobytes())
+    if not output.tell():
+        raise AIServiceError('The recording contains no audio. Please record your answer again.')
+    if output.tell() > limit:
+        raise AIServiceError('Keep each Speaking answer under 10 minutes.')
+    return np.frombuffer(output.getbuffer(), dtype=np.int16).astype(np.float32) / 32768.0
+
+
 def transcribe_audio(audio_file):
     """Transcribe one browser-recorded speaking answer locally."""
     audio_bytes = audio_file.read()
@@ -96,19 +153,12 @@ def transcribe_audio(audio_file):
     if len(audio_bytes) > 15 * 1024 * 1024:
         raise AIServiceError("That recording is too large. Keep each answer under 15 MB.")
 
-    filename = audio_file.filename or "speaking-answer.webm"
-    suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix) as temporary_audio:
-            temporary_audio.write(audio_bytes)
-            temporary_audio.flush()
-            segments, _info = _whisper_model().transcribe(
-                temporary_audio.name,
-                beam_size=5,
-                language="en",
-                vad_filter=True,
-            )
-            transcript = " ".join(segment.text.strip() for segment in segments).strip()
+        samples = _decode_speaking_audio(audio_bytes)
+        segments, _info = _whisper_model().transcribe(
+            samples, beam_size=5, language="en", vad_filter=True,
+        )
+        transcript = " ".join(segment.text.strip() for segment in segments).strip()
     except AIServiceError:
         raise
     except Exception as error:
@@ -122,7 +172,7 @@ def generate_next_speaking_question(current_question, next_plan, history):
     schema = {
         "type": "object",
         "properties": {
-            "question": {"type": "string"},
+            "question": {"type": "string", "minLength": 1, "maxLength": 4000},
             "examiner_note": {"type": "string"},
         },
         "required": ["question", "examiner_note"],
@@ -157,7 +207,7 @@ def evaluate_writing(prompt, essay, word_count):
             "grammar_band": {"type": "number", "minimum": 0, "maximum": 9},
             "strengths": {"type": "array", "items": {"type": "string"}},
             "improvements": {"type": "array", "items": {"type": "string"}},
-            "feedback": {"type": "string"},
+            "feedback": {"type": "string", "minLength": 1},
         },
         "required": [
             "overall_band",
@@ -196,7 +246,7 @@ def evaluate_speaking(turns):
             "pronunciation_band": {"type": "number", "minimum": 0, "maximum": 9},
             "strengths": {"type": "array", "items": {"type": "string"}},
             "improvements": {"type": "array", "items": {"type": "string"}},
-            "feedback": {"type": "string"},
+            "feedback": {"type": "string", "minLength": 1},
         },
         "required": [
             "overall_band",

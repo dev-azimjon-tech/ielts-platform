@@ -1,0 +1,35 @@
+{
+  "duration": 150.5,
+  "chapters": [
+    {
+      "id": "getting-started",
+      "start": 0.0,
+      "end": 26.25
+    },
+    {
+      "id": "mock-tests",
+      "start": 26.25,
+      "end": 50.125
+    },
+    {
+      "id": "study-tools",
+      "start": 50.125,
+      "end": 73.75
+    },
+    {
+      "id": "ai-practice",
+      "start": 73.75,
+      "end": 101.375
+    },
+    {
+      "id": "flashcards",
+      "start": 101.375,
+      "end": 126.25
+    },
+    {
+      "id": "progress-and-appearance",
+      "start": 126.25,
+      "end": 150.5
+    }
+  ]
+}

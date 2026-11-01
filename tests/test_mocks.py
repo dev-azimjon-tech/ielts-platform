@@ -46,7 +46,12 @@ def test_mock_library_and_reading_submission(client):
     assert response.status_code == 200
     assert b"The Hidden Life of Urban Trees" in response.data
     assert b"Next passage" in response.data
-    assert b"not submitted this mock yet" in response.data
+    assert b'id="exit-mock"' in response.data
+    assert b'class="site-nav"' not in response.data
+    assert b'class="site-footer"' not in response.data
+    assert b'id="section-notes"' in response.data
+    assert b'data-highlight-id="passage-' in response.data
+    assert b'/static/js/exam.js' in response.data
 
     response = client.get("/mocks/2")
     assert response.status_code == 200
@@ -70,3 +75,33 @@ def test_mock_library_and_reading_submission(client):
     )
     assert response.status_code == 200
     assert b"/ 40" in response.data
+
+
+def test_official_resources_are_available_without_using_allowance(app, client):
+    from app.database import get_db
+
+    with app.app_context():
+        db = get_db()
+        user_id = db.execute("SELECT id FROM users WHERE email = 'practice@example.com'").fetchone()["id"]
+        db.executemany(
+            "INSERT INTO attempts (user_id, mock_id, score, total_points, answers_json) VALUES (?, 1, 20, 40, '{}')",
+            [(user_id,)] * 10,
+        )
+        db.commit()
+
+    response = client.get('/mocks/?skill=reading')
+    assert response.status_code == 200
+    assert b'23435-ielts-sample-papers.zip' in response.data
+    assert b'Official Academic Reading sample' in response.data
+    assert b'Official Listening sample' not in response.data
+    assert b'Listening Mock 1' not in response.data
+    assert b'Free limit reached' in response.data
+    assert client.get('/mocks/1').status_code == 302
+
+
+def test_mock_page_does_not_send_correct_answers_or_duplicate_passage_json(client):
+    response = client.get('/mocks/1')
+    assert b'correct_answer' not in response.data
+    assert b'"options_json"' not in response.data
+    # The long passage is rendered once, not repeated in a JavaScript payload.
+    assert response.data.count(b'When a city plants a tree, the visible part') == 1

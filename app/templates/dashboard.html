@@ -14,6 +14,7 @@
             <div class="status-chip"><span class="status-dot"></span>{% if current_user.is_premium %}Premium plan{% else %}Free plan{% endif %}</div>
         </div>
 
+        <div class="learn-actions" style="margin-bottom:24px"><a class="button" href="{{ url_for('learning.plan') }}">Today's study plan →</a> <a class="button button-outline" href="{{ url_for('learning.index') }}">Open learning hub</a> <a class="button button-outline" href="{{ url_for('learning.teachers') }}#your-assignments">Assignments &amp; teacher feedback</a></div>
         <div class="dashboard-summary-grid">
             <article class="dashboard-summary-card summary-primary">
                 <span class="summary-label">Mocks completed</span>
@@ -40,7 +41,7 @@
 
         <div class="dashboard-section-heading">
             <div><p class="eyebrow">Your performance</p><h2>Average score by skill</h2></div>
-            <span class="dashboard-heading-note">Scores update after every submitted mock.</span>
+            <a class="text-link" href="{{ url_for('learning.progress') }}">View detailed progress →</a>
         </div>
 
         <div class="dashboard-skill-grid">

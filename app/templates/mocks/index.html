@@ -9,11 +9,30 @@
             <div>
                 <p class="eyebrow">Practice library</p>
                 <h1>Choose a mock and begin.</h1>
-                <p>These original practice tests follow the structure of IELTS Reading and Listening tasks.</p>
+                <p>Build your confidence with complete mocks and free official practice.</p>
             </div>
             <a class="text-link" href="{{ url_for('main.dashboard') }}">← Back to dashboard</a>
         </div>
 
+        <nav class="practice-filters" aria-label="Filter practice by skill">
+            {% for key, label in [('all', 'All practice'), ('reading', 'Reading'), ('listening', 'Listening')] %}
+                <a class="practice-filter{% if selected_skill == key %} is-selected{% endif %}" href="{{ url_for('mocks.index', skill=key) }}"{% if selected_skill == key %} aria-current="page"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </nav>
+        <section class="official-practice" aria-labelledby="official-practice-title">
+            <div class="practice-section-heading"><div><p class="eyebrow">Free official resources</p><h2 id="official-practice-title">Practice with Cambridge &amp; IELTS</h2></div><span class="official-free-label">Free for everyone</span></div>
+            <p class="resource-intro">Open official samples on the publisher's website. External practice does not use your mock allowance or appear in your dashboard results.</p>
+            <div class="resource-grid">
+                {% for resource in official_resources %}
+                    <article class="resource-card">
+                        <span class="resource-provider">{{ resource.provider }}</span><h3>{{ resource.title }}</h3><p>{{ resource.description }}</p><span class="resource-detail">{{ resource.detail }}</span>
+                        <a class="button button-outline button-full" href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">{{ resource.action }} <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+                        <a class="resource-source" href="{{ resource.source_url }}" target="_blank" rel="noopener noreferrer">Publisher page &amp; help<span class="sr-only"> (opens in a new tab)</span></a>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+        <div class="practice-section-heading"><div><p class="eyebrow">Your practice space</p><h2>Full mock tests</h2></div><span>Notes · Highlighting · Saved progress</span></div>
         <div class="mock-grid">
             {% for mock in mocks %}
                 <article class="mock-card">

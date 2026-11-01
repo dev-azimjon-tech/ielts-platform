@@ -3,7 +3,7 @@
 {% block title %}Your result · IELTS Platform{% endblock %}
 
 {% block content %}
-<section class="mock-take-section">
+<section class="mock-take-section" data-completed-draft-key="ielts:mock:v1:{{ current_user.id }}:{{ mock.id }}">
     <div class="container result-shell">
         <div class="result-hero">
             <p class="eyebrow">Mock complete</p>
@@ -12,8 +12,9 @@
             <p>You answered {{ score }} of {{ total }} questions correctly.</p>
             <a class="button" href="{{ url_for('mocks.index') }}">Try another mock <span aria-hidden="true">→</span></a>
         </div>
+        <a class="button button-outline" href="{{ url_for('learning.notebook') }}">Review my mistakes →</a>
         <div class="review-card">
-            <div class="questions-heading"><div><p class="eyebrow">Answer review</p><h2>Learn from each question</h2></div><span>{{ ((score / total) * 100)|round|int }}%</span></div>
+            <div class="questions-heading"><div><p class="eyebrow">Answer review</p><h2>Learn from each question</h2></div><span>{{ ((score / total) * 100)|round|int if total else 0 }}%</span></div>
             {% for question in questions %}
                 <div class="review-row {{ 'review-correct' if question.is_correct else 'review-wrong' }}">
                     <div class="review-title"><span class="question-number">{{ question.question_number }}</span><strong>{{ question.prompt }}</strong><span class="review-mark">{{ '✓' if question.is_correct else '×' }}</span></div>
@@ -25,3 +26,4 @@
     </div>
 </section>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/exam.js') }}" defer></script>{% endblock %}

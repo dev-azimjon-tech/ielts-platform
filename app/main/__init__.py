@@ -1,4 +1,6 @@
-from flask import Blueprint, redirect, render_template, url_for
+import json
+
+from flask import Blueprint, current_app, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from ..database import get_db
@@ -66,15 +68,23 @@ def _estimated_band(score, total_points, skill):
     return 0.0
 
 
-def _average_band(bands):
-    return round(sum(bands) / len(bands), 1) if bands else 0.0
-
-
 @main_bp.route("/")
 def index():
     if current_user.is_authenticated:
         return redirect(url_for("main.dashboard"))
     return render_template("index.html")
+
+
+@main_bp.route("/guide")
+def guide():
+    from ..platform_guide import GUIDE_CHAPTERS
+
+    with current_app.open_resource("static/media/platform-guide.json") as manifest_file:
+        manifest = json.load(manifest_file)
+    timings = {chapter["id"]: chapter for chapter in manifest["chapters"]}
+    chapters = [{**chapter, "start": timings[chapter["id"]]["start"]} for chapter in GUIDE_CHAPTERS]
+    seconds = round(manifest["duration"])
+    return render_template("guide.html", chapters=chapters, duration=f"{seconds // 60}:{seconds % 60:02d}")
 
 
 @main_bp.route("/dashboard")
@@ -91,39 +101,37 @@ def dashboard():
     }
     skill_icons = {"reading": "R", "listening": "L", "speaking": "S", "writing": "W"}
     skill_stats = []
+    # Aggregate equal marks in SQLite so the dashboard does not load the
+    # student's full answer history or rescan it for every skill.
+    summaries = db.execute(
+        """
+        SELECT m.skill, a.score, a.total_points, COUNT(*) AS completed
+        FROM attempts AS a JOIN mock_tests AS m ON m.id = a.mock_id
+        WHERE a.user_id = ? GROUP BY m.skill, a.score, a.total_points
+        UNION ALL
+        SELECT m.skill, a.band_score AS score, 9 AS total_points, COUNT(*) AS completed
+        FROM ai_attempts AS a JOIN ai_mocks AS m ON m.id = a.ai_mock_id
+        WHERE a.user_id = ? GROUP BY m.skill, a.band_score
+        """,
+        (current_user.id, current_user.id),
+    ).fetchall()
+    skill_totals = {skill: {"completed": 0, "band_total": 0.0} for skill in free_limits}
+    for row in summaries:
+        band = (
+            float(row["score"]) if row["skill"] in {"speaking", "writing"}
+            else _estimated_band(row["score"], row["total_points"], row["skill"])
+        )
+        totals = skill_totals[row["skill"]]
+        totals["completed"] += row["completed"]
+        totals["band_total"] += band * row["completed"]
 
+    revisions = db.execute("SELECT COUNT(*) FROM writing_revisions r JOIN ai_attempts a ON a.id=r.attempt_id WHERE a.user_id=?", (current_user.id,)).fetchone()[0]
     for skill in free_limits:
         is_ai_skill = skill in {"speaking", "writing"}
-        if is_ai_skill:
-            rows = db.execute(
-                """
-                SELECT band_score
-                FROM ai_attempts AS a
-                JOIN ai_mocks AS m ON m.id = a.ai_mock_id
-                WHERE a.user_id = ? AND m.skill = ?
-                """,
-                (current_user.id, skill),
-            ).fetchall()
-            practice_url = url_for("ai.index")
-            bands = [round(float(row["band_score"]), 1) for row in rows]
-        else:
-            rows = db.execute(
-                """
-                SELECT score, total_points
-                FROM attempts AS a
-                JOIN mock_tests AS m ON m.id = a.mock_id
-                WHERE a.user_id = ? AND m.skill = ?
-                """,
-                (current_user.id, skill),
-            ).fetchall()
-            practice_url = url_for("mocks.index")
-            bands = [
-                _estimated_band(row["score"], row["total_points"], skill)
-                for row in rows
-            ]
-
-        completed = len(bands)
-        average_band = _average_band(bands)
+        practice_url = url_for("ai.index") if is_ai_skill else url_for("mocks.index", skill=skill)
+        totals = skill_totals[skill]
+        completed = totals["completed"]
+        average_band = round(totals["band_total"] / completed, 1) if completed else 0.0
         limit = premium_limits[skill] if current_user.is_premium else free_limits[skill]
         skill_stats.append(
             {
@@ -132,7 +140,7 @@ def dashboard():
                 "icon": skill_icons[skill],
                 "limit": limit,
                 "completed": completed,
-                "remaining": max(limit - completed, 0),
+                "remaining": max(limit - completed - (revisions if skill == "writing" else 0), 0),
                 "average_band": average_band,
                 "band_percent": round(average_band / 9 * 100),
                 "practice_url": practice_url,
@@ -173,37 +181,16 @@ def dashboard():
     ]
     completed_mocks = sum(stat["completed"] for stat in skill_stats)
 
-    regular_attempts = db.execute(
-        """
-        SELECT a.score, a.total_points, m.skill
-        FROM attempts AS a
-        JOIN mock_tests AS m ON m.id = a.mock_id
-        WHERE a.user_id = ?
-        """,
-        (current_user.id,),
-    ).fetchall()
-    ai_attempts = db.execute(
-        """
-        SELECT a.band_score, m.skill
-        FROM ai_attempts
-        AS a JOIN ai_mocks AS m ON m.id = a.ai_mock_id
-        WHERE a.user_id = ?
-        """,
-        (current_user.id,),
-    ).fetchall()
-    all_bands = [
-        _estimated_band(row["score"], row["total_points"], row["skill"])
-        for row in regular_attempts
-    ] + [round(float(row["band_score"]), 1) for row in ai_attempts]
+    band_total = sum(totals["band_total"] for totals in skill_totals.values())
 
     return render_template(
         "dashboard.html",
         skill_stats=skill_stats,
         recent_attempts=recent_attempts,
         completed_mocks=completed_mocks,
-        overall_average_band=_average_band(all_bands),
+        overall_average_band=round(band_total / completed_mocks, 1) if completed_mocks else 0.0,
         free_remaining=sum(
-            max(free_limits[stat["key"]] - stat["completed"], 0)
+            max(free_limits[stat["key"]] - stat["completed"] - (revisions if stat["key"] == "writing" else 0), 0)
             for stat in skill_stats
         ),
     )

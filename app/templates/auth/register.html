@@ -11,6 +11,7 @@
             <p>Set up your account and begin your IELTS preparation today.</p>
         </div>
         <form class="auth-form" method="post">
+            <input type="hidden" name="csrf_token" value="{{ app_csrf_token }}">
             <div class="field">
                 <label for="name">Full name</label>
                 <input id="name" name="name" type="text" autocomplete="name" value="{{ request.form.get('name', '') }}" placeholder="Your name" required>

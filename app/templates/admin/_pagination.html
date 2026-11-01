@@ -1,0 +1,4 @@
+<nav class="admin-pagination" aria-label="Results pagination">
+    <span>{{ pagination.start }}–{{ pagination.end }} of {{ pagination.total }} results</span>
+    <div>{% if pagination.previous %}<a class="button button-small button-outline" href="{{ pagination.previous }}">← Previous</a>{% endif %}<span>Page {{ pagination.page }} of {{ pagination.pages }}</span>{% if pagination.next %}<a class="button button-small button-outline" href="{{ pagination.next }}">Next →</a>{% endif %}</div>
+</nav>

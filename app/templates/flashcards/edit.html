@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Edit flashcard · IELTS Platform{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/flashcards.css') }}">{% endblock %}
+{% block content %}
+<section class="vocab-section"><div class="container vocab-narrow">
+    <a class="back-link" href="{{ url_for('flashcards.index') }}">← Your vocabulary</a>
+    <div class="vocab-add-card"><p class="eyebrow">Make it memorable</p><h1>Edit your flashcard</h1>
+        <form class="vocab-form" method="post" action="{{ url_for('flashcards.edit_word', word_id=word.id) }}">
+            {% include "flashcards/_word_fields.html" %}
+            <div class="vocab-practice-actions"><button class="button" type="submit">Save changes</button><a class="button button-outline" href="{{ url_for('flashcards.index') }}">Cancel</a></div>
+        </form>
+    </div>
+</div></section>
+{% endblock %}

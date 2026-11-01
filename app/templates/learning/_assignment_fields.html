@@ -1,0 +1,2 @@
+<input type="hidden" name="request_token" value="{{ assignment_token }}">
+<label>Practice<select name="mock" required><option value="">Choose a practice task</option>{% for c in choices %}<option value="{{ c.kind }}:{{ c.id }}">{{ c.skill|capitalize }} · {{ c.title }}</option>{% endfor %}</select></label><label>Due date<input type="date" name="due_on" min="{{ today }}" required></label><label>Instructions<textarea name="note" maxlength="1000" rows="3" placeholder="What should the student focus on?"></textarea></label>

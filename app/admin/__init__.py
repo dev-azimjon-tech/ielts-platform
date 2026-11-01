@@ -1,7 +1,9 @@
 import json
+import math
+import secrets
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
 
 from ..database import get_db
@@ -10,6 +12,28 @@ from ..database import get_db
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 VALID_SKILLS = {"reading", "listening"}
 VALID_QUESTION_TYPES = {"multiple_choice", "tfng", "short_answer"}
+
+
+@admin_bp.context_processor
+def admin_context():
+    if "admin_csrf_token" not in session:
+        session["admin_csrf_token"] = secrets.token_urlsafe(32)
+    return {"admin_csrf_token": session["admin_csrf_token"]}
+
+
+def _search_pattern(query):
+    return "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def _pagination(total, endpoint, filters):
+    pages = max(1, math.ceil(total / 20))
+    page = min(max(request.args.get("page", 1, type=int) or 1, 1), pages)
+    return {
+        "page": page, "pages": pages, "total": total,
+        "start": (page - 1) * 20 + 1 if total else 0, "end": min(page * 20, total),
+        "previous": url_for(endpoint, **filters, page=page - 1) if page > 1 else None,
+        "next": url_for(endpoint, **filters, page=page + 1) if page < pages else None,
+    }
 
 
 def admin_required(view):
@@ -21,6 +45,11 @@ def admin_required(view):
             return redirect(url_for("auth.login"))
         if not current_user.is_admin:
             abort(403)
+        if request.method == "POST":
+            expected = session.get("admin_csrf_token", "")
+            supplied = request.form.get("csrf_token", "")
+            if not expected or not secrets.compare_digest(expected.encode(), supplied.encode()):
+                abort(400, description="This form expired. Refresh the admin page and try again.")
         return view(*args, **kwargs)
 
     return wrapped_view
@@ -140,8 +169,8 @@ def _question_values(mock):
     elif not correct_answer:
         error = "The correct answer is required."
     elif question_type == "multiple_choice":
-        if len(options) < 2:
-            error = "Multiple-choice questions need at least two options."
+        if not 2 <= len(options) <= 26:
+            error = "Multiple-choice questions need between 2 and 26 options."
         elif correct_answer.upper() not in {
             chr(65 + index) for index in range(len(options))
         }:
@@ -170,37 +199,42 @@ def _question_values(mock):
 @admin_required
 def index():
     db = get_db()
-    counts = {
-        "users": db.execute("SELECT COUNT(*) AS value FROM users").fetchone()["value"],
-        "premium_users": db.execute(
-            "SELECT COUNT(*) AS value FROM users WHERE is_premium = 1"
-        ).fetchone()["value"],
-        "mocks": db.execute("SELECT COUNT(*) AS value FROM mock_tests").fetchone()["value"],
-        "published_mocks": db.execute(
-            "SELECT COUNT(*) AS value FROM mock_tests WHERE is_published = 1"
-        ).fetchone()["value"],
-        "attempts": db.execute("SELECT COUNT(*) AS value FROM attempts").fetchone()["value"],
-    }
+    counts = dict(db.execute("""
+        SELECT (SELECT COUNT(*) FROM users) AS users,
+        (SELECT COUNT(*) FROM users WHERE is_premium = 1 AND is_admin = 0) AS premium_users,
+        (SELECT COUNT(*) FROM mock_tests) AS mocks,
+        (SELECT COUNT(*) FROM mock_tests WHERE is_published = 1) AS published_mocks,
+        (SELECT COUNT(*) FROM ai_mocks WHERE is_published = 1) AS published_ai,
+        (SELECT COUNT(*) FROM attempts) + (SELECT COUNT(*) FROM ai_attempts) AS attempts,
+        (SELECT COUNT(*) FROM vocabulary_words) AS vocabulary_words,
+        (SELECT COUNT(*) FROM vocabulary_quizzes WHERE completed_at IS NOT NULL) AS vocabulary_quizzes,
+        (SELECT COUNT(*) FROM users WHERE created_at >= datetime('now', '-7 days')) AS new_users
+    """).fetchone())
     recent_users = db.execute(
-        """
-        SELECT id, name, email, is_premium, is_admin, created_at
-        FROM users ORDER BY id DESC LIMIT 8
-        """
+        "SELECT id, name, email, is_premium, is_admin, created_at FROM users ORDER BY id DESC LIMIT 6"
     ).fetchall()
-    recent_attempts = db.execute(
-        """
+    recent_attempts = db.execute("""
         SELECT a.score, a.total_points, a.completed_at, u.name, m.title, m.skill
-        FROM attempts AS a
-        JOIN users AS u ON u.id = a.user_id
-        JOIN mock_tests AS m ON m.id = a.mock_id
-        ORDER BY a.id DESC LIMIT 8
-        """
-    ).fetchall()
+        FROM attempts a JOIN users u ON u.id = a.user_id JOIN mock_tests m ON m.id = a.mock_id
+        UNION ALL
+        SELECT a.band_score, 9, a.completed_at, u.name, m.title, m.skill
+        FROM ai_attempts a JOIN users u ON u.id = a.user_id JOIN ai_mocks m ON m.id = a.ai_mock_id
+        ORDER BY completed_at DESC LIMIT 8
+    """).fetchall()
+    drafts = db.execute("""
+        SELECT m.id, m.title, m.skill, COUNT(q.id) AS question_count
+        FROM mock_tests m LEFT JOIN questions q ON q.mock_id = m.id
+        WHERE m.is_published = 0 GROUP BY m.id ORDER BY m.id DESC LIMIT 5
+    """).fetchall()
+    skill_activity = db.execute("""
+        SELECT m.skill, COUNT(*) AS completed FROM attempts a JOIN mock_tests m ON m.id = a.mock_id GROUP BY m.skill
+        UNION ALL
+        SELECT m.skill, COUNT(*) FROM ai_attempts a JOIN ai_mocks m ON m.id = a.ai_mock_id GROUP BY m.skill
+    """).fetchall()
+    activity = {row['skill']: row['completed'] for row in skill_activity}
     return render_template(
-        "admin/dashboard.html",
-        counts=counts,
-        recent_users=recent_users,
-        recent_attempts=recent_attempts,
+        "admin/dashboard.html", counts=counts, recent_users=recent_users,
+        recent_attempts=recent_attempts, drafts=drafts, activity=activity,
     )
 
 
@@ -208,24 +242,35 @@ def index():
 @admin_required
 def mocks():
     db = get_db()
-    rows = db.execute("SELECT * FROM mock_tests ORDER BY skill, id").fetchall()
-    mocks = []
-    for row in rows:
-        mock = dict(row)
-        if mock["skill"] == "reading":
-            section_table = "reading_passages"
-        else:
-            section_table = "listening_scripts"
-        mock["section_count"] = db.execute(
-            f"SELECT COUNT(*) AS value FROM {section_table} WHERE mock_id = ?",
-            (mock["id"],),
-        ).fetchone()["value"]
-        mock["question_count"] = db.execute(
-            "SELECT COUNT(*) AS value FROM questions WHERE mock_id = ?",
-            (mock["id"],),
-        ).fetchone()["value"]
-        mocks.append(mock)
-    return render_template("admin/mocks.html", mocks=mocks)
+    q = request.args.get('q', '').strip()[:100]
+    skill = request.args.get('skill', '')
+    status = request.args.get('status', '')
+    skill = skill if skill in VALID_SKILLS else ''
+    status = status if status in {'draft', 'published'} else ''
+    conditions, params = ['1 = 1'], []
+    if q:
+        conditions.append("m.title LIKE ? ESCAPE '\\'")
+        params.append(_search_pattern(q))
+    if skill:
+        conditions.append('m.skill = ?')
+        params.append(skill)
+    if status:
+        conditions.append('m.is_published = ?')
+        params.append(int(status == 'published'))
+    where = ' AND '.join(conditions)
+    total = db.execute(f'SELECT COUNT(*) FROM mock_tests m WHERE {where}', params).fetchone()[0]
+    filters = dict(q=q, skill=skill, status=status)
+    pagination = _pagination(total, 'admin.mocks', filters)
+    rows = db.execute(f"""
+        SELECT m.*, COALESCE(qc.total, 0) AS question_count,
+        CASE WHEN m.skill = 'reading' THEN COALESCE(r.total, 0) ELSE COALESCE(l.total, 0) END AS section_count
+        FROM mock_tests m
+        LEFT JOIN (SELECT mock_id, COUNT(*) total FROM questions GROUP BY mock_id) qc ON qc.mock_id = m.id
+        LEFT JOIN (SELECT mock_id, COUNT(*) total FROM reading_passages GROUP BY mock_id) r ON r.mock_id = m.id
+        LEFT JOIN (SELECT mock_id, COUNT(*) total FROM listening_scripts GROUP BY mock_id) l ON l.mock_id = m.id
+        WHERE {where} ORDER BY m.is_published, m.id DESC LIMIT 20 OFFSET ?
+    """, [*params, (pagination['page'] - 1) * 20]).fetchall()
+    return render_template('admin/mocks.html', mocks=rows, pagination=pagination, **filters)
 
 
 @admin_bp.route("/mocks/new", methods=("GET", "POST"))
@@ -268,6 +313,13 @@ def edit_mock_details(mock_id):
     values = mock.copy()
     if request.method == "POST":
         values, error = _form_mock_values()
+        if error is None and values['skill'] != mock['skill']:
+            has_content = get_db().execute('''SELECT EXISTS(SELECT 1 FROM reading_passages WHERE mock_id=?)
+                OR EXISTS(SELECT 1 FROM listening_scripts WHERE mock_id=?)
+                OR EXISTS(SELECT 1 FROM questions WHERE mock_id=?)
+                OR EXISTS(SELECT 1 FROM attempts WHERE mock_id=?)''', (mock_id,)*4).fetchone()[0]
+            if has_content:
+                error = 'Create a new mock to change skills after content or attempts have been added.'
         if error is None:
             db = get_db()
             db.execute(
@@ -316,6 +368,14 @@ def toggle_publish(mock_id):
             "SELECT COUNT(*) AS value FROM questions WHERE mock_id = ?",
             (mock_id,),
         ).fetchone()["value"]
+        parent_key = 'passage_id' if mock['skill']=='reading' else 'listening_script_id'
+        other_key = 'listening_script_id' if mock['skill']=='reading' else 'passage_id'
+        invalid_questions = db.execute(f'''SELECT COUNT(*) FROM questions q LEFT JOIN {section_table} s
+            ON s.id=q.{parent_key} AND s.mock_id=q.mock_id
+            WHERE q.mock_id=? AND (s.id IS NULL OR q.{other_key} IS NOT NULL)''',(mock_id,)).fetchone()[0]
+        if invalid_questions:
+            flash('Fix question section links before publishing this mock.', 'error')
+            return redirect(url_for('admin.edit_mock', mock_id=mock_id))
         if section_count == 0 or question_count == 0:
             flash("Add at least one passage/section and one question before publishing.", "error")
             return redirect(url_for("admin.edit_mock", mock_id=mock_id))
@@ -484,6 +544,9 @@ def edit_question(question_id):
     if request.method == "POST":
         values, error = _question_values(mock)
         if error is None:
+            from ..mock_results import freeze_legacy_reviews
+            db.execute('BEGIN IMMEDIATE')
+            freeze_legacy_reviews(mock['id'])
             db.execute(
                 """
                 UPDATE questions
@@ -522,6 +585,9 @@ def delete_question(question_id):
     ).fetchone()
     if row is None:
         abort(404)
+    from ..mock_results import freeze_legacy_reviews
+    db.execute('BEGIN IMMEDIATE')
+    freeze_legacy_reviews(row['mock_id'])
     db.execute("DELETE FROM questions WHERE id = ?", (question_id,))
     db.commit()
     flash("Question deleted.", "success")
@@ -531,13 +597,55 @@ def delete_question(question_id):
 @admin_bp.route("/users")
 @admin_required
 def users():
-    rows = get_db().execute(
-        """
-        SELECT id, name, email, is_premium, is_admin, created_at
-        FROM users ORDER BY id DESC
-        """
-    ).fetchall()
-    return render_template("admin/users.html", users=rows)
+    db = get_db()
+    q = request.args.get('q', '').strip()[:100]
+    role = request.args.get('role', '')
+    plan = request.args.get('plan', '')
+    role = role if role in {'student', 'admin'} else ''
+    plan = plan if plan in {'free', 'premium'} else ''
+    conditions, params = ['1 = 1'], []
+    if q:
+        conditions.append("(u.name LIKE ? ESCAPE '\\' OR u.email LIKE ? ESCAPE '\\')")
+        params.extend([_search_pattern(q)] * 2)
+    if role:
+        conditions.append('u.is_admin = ?')
+        params.append(int(role == 'admin'))
+    if plan:
+        conditions.append('u.is_premium = ?')
+        params.append(int(plan == 'premium'))
+    where = ' AND '.join(conditions)
+    total = db.execute(f'SELECT COUNT(*) FROM users u WHERE {where}', params).fetchone()[0]
+    filters = dict(q=q, role=role, plan=plan)
+    pagination = _pagination(total, 'admin.users', filters)
+    rows = db.execute(f"""
+        SELECT u.id, u.name, u.email, u.is_premium, u.is_admin, u.created_at,
+        COALESCE(a.total, 0) + COALESCE(ai.total, 0) AS attempts
+        FROM users u
+        LEFT JOIN (SELECT user_id, COUNT(*) total FROM attempts GROUP BY user_id) a ON a.user_id = u.id
+        LEFT JOIN (SELECT user_id, COUNT(*) total FROM ai_attempts GROUP BY user_id) ai ON ai.user_id = u.id
+        WHERE {where} ORDER BY u.id DESC LIMIT 20 OFFSET ?
+    """, [*params, (pagination['page'] - 1) * 20]).fetchall()
+    return render_template('admin/users.html', users=rows, pagination=pagination, **filters)
+
+
+@admin_bp.route('/users/<int:user_id>/premium', methods=('POST',))
+@admin_required
+def set_premium(user_id):
+    db = get_db()
+    user = db.execute('SELECT id, name, is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
+    if user is None:
+        abort(404)
+    if user['is_admin']:
+        abort(400, description='Premium access is managed for student accounts only.')
+    state = request.form.get('premium')
+    if state not in {'0', '1'}:
+        abort(400)
+    db.execute('UPDATE users SET is_premium = ? WHERE id = ?', (int(state), user_id))
+    db.commit()
+    flash(f"Premium access {'enabled' if state == '1' else 'removed'} for {user['name']}.", 'success')
+    return redirect(url_for('admin.users', q=request.form.get('q', '')[:100],
+                            role=request.form.get('role', ''), plan=request.form.get('plan', ''),
+                            page=request.form.get('page', 1, type=int)))
 
 
 @admin_bp.route("/users/<int:user_id>/toggle-premium", methods=("POST",))
@@ -547,6 +655,8 @@ def toggle_premium(user_id):
     user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if user is None:
         abort(404)
+    if user['is_admin']:
+        abort(400, description='Premium access is managed for student accounts only.')
     new_state = 0 if user["is_premium"] else 1
     db.execute("UPDATE users SET is_premium = ? WHERE id = ?", (new_state, user_id))
     db.commit()

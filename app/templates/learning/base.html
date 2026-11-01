@@ -1,0 +1,3 @@
+{% extends 'base.html' %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static',filename='css/learning.css') }}">{% endblock %}
+{% block content %}<section class="learn-section"><div class="container learn-shell"><nav class="learn-nav" aria-label="Learning tools">{% for endpoint,label in [('index','Learning hub'),('notebook','Mistakes'),('review','Vocabulary review'),('plan','Study plan'),('progress','Progress'),('exam','Exam simulation'),('speaking_history','Speaking review'),('teachers','Teachers')] %}<a href="{{ url_for('learning.'+endpoint) }}"{% if request.endpoint=='learning.'+endpoint %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>{% block learning %}{% endblock %}</div></section>{% endblock %}

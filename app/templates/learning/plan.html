@@ -1,0 +1,60 @@
+{% extends 'learning/base.html' %}
+{% block title %}Your study plan · IELTS{% endblock %}
+{% block learning %}
+<p class="eyebrow">Small sessions, clear goals</p>
+<h1>Your personal study plan</h1>
+{% if plan %}
+<p>Target band {{ plan.target_band }} · {% if days > 0 %}{{ days }} days until {{ plan.exam_date }}{% elif days == 0 %}Your exam is today{% else %}Your exam date has passed. Set a new date below{% endif %} · {{ plan.daily_minutes }} minutes daily.</p>
+{% else %}<p>Set your target and exam date to personalise your plan. You can start with a 30-minute session today.</p>{% endif %}
+<div class="plan-layout">
+    <aside class="learn-card plan-goal">
+        <h2>Set your goal</h2>
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ learning_csrf }}">
+            <label>Target band<input type="number" name="target_band" min="1" max="9" step="0.5" value="{{ plan.target_band if plan else 7 }}" required></label>
+            <label>Exam date<input type="date" name="exam_date" min="{{ today }}" value="{{ plan.exam_date if plan else '' }}" required></label>
+            <label>Minutes per day<input type="number" name="daily_minutes" min="10" max="240" value="{{ plan.daily_minutes if plan else 30 }}" required></label>
+            <button class="button">Save plan</button>
+        </form>
+        <p class="review-help">Once you mark a task complete, today's session stays fixed. Goal changes then apply from tomorrow.</p>
+    </aside>
+    <section class="learn-card">
+        <p class="eyebrow">{{ daily.phase }} · <time datetime="{{ today }}">{{ today }}</time></p>
+        <h2>Today's tasks</h2>
+        <p>{{ daily.minutes }} minutes · {{ daily.focus|capitalize }} focus · Target band {{ daily.target_band }}</p>
+        <label class="plan-progress-label" for="plan-progress">{{ done|length }} of {{ tasks|length }} tasks complete · {{ completed_minutes }} of {{ daily.minutes }} planned minutes marked complete</label>
+        <progress id="plan-progress" max="{{ tasks|length }}" value="{{ done|length }}">{{ done|length }}/{{ tasks|length }}</progress>
+        {% for task in tasks %}
+        <article class="plan-task{% if task.key in done %} is-complete{% endif %}">
+            <div class="plan-task-top"><h3>{{ task.title }}</h3><span>{{ task.minutes }} min</span></div>
+            <p>{{ task.reason }}</p>
+            <div class="plan-task-actions">
+                <a class="text-link" href="{{ task.url }}">{{ 'Open again' if task.key in done else 'Start task' }} →</a>
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ learning_csrf }}">
+                    <input type="hidden" name="task_key" value="{{ task.key }}">
+                    <button class="button button-outline button-small" name="action" value="{{ 'undo' if task.key in done else 'complete' }}">{{ 'Completed ✓ · Undo' if task.key in done else 'Mark complete' }}</button>
+                </form>
+            </div>
+        </article>
+        {% endfor %}
+        {% if done|length == tasks|length %}<div class="plan-complete" role="status"><strong>Today's session is complete.</strong><p>Your next session will be ready tomorrow. You can still open any task to practise more.</p></div>{% endif %}
+        <p class="review-help">These are suggested study blocks. A full mock may take longer; you can use a short block to review a familiar task or prepare your response.</p>
+    </section>
+</div>
+<section class="learn-card">
+    <h2>Your skill targets</h2>
+    <p>Estimates use up to five recent mocks per skill. Untried skills get baseline practice; larger gaps to your target receive priority, with regular rotation across all four skills.</p>
+    <div class="plan-skill-grid">
+        {% for item in gaps %}<div class="plan-skill"><strong>{{ item.skill|capitalize }}</strong><span>{{ item.average if item.average is not none else '—' }} / 9 recent average</span><small>{% if item.gap is none %}Establish a baseline{% elif item.gap > 0 %}{{ '%.1f'|format(item.gap) }} below your target{% else %}At or above your target{% endif %}</small></div>{% endfor %}
+    </div>
+</section>
+<section class="learn-card">
+    <h2>Your next seven days</h2>
+    <p>Upcoming sessions are previews based on current results. They update as you practise. The final week gives more time to recall and reflection; exam day uses a light warm-up.</p>
+    <div class="plan-week">
+        {% for day in week %}<article><time datetime="{{ day.date }}">{{ 'Today' if loop.first else day.date }}</time><strong>{{ day.focus|capitalize }}</strong><span>{{ day.phase }}</span><small>{{ day.minutes }} min</small></article>{% endfor %}
+    </div>
+    {% if days is not none and days < 7 %}<p class="review-help">The preview ends at your exam date. Set a new date to plan further ahead.</p>{% endif %}
+</section>
+{% endblock %}

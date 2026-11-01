@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="admin-navigation"><nav class="container admin-navigation-inner" aria-label="Administration">
+    <span class="admin-workspace-label">Admin workspace</span>
+    <a href="{{ url_for('admin.index') }}"{% if request.endpoint == 'admin.index' %} aria-current="page"{% endif %}>Overview</a>
+    <a href="{{ url_for('admin.mocks') }}"{% if request.endpoint not in ['admin.index', 'admin.users', 'admin.set_premium'] %} aria-current="page"{% endif %}>Mock library</a>
+    <a href="{{ url_for('admin.users') }}"{% if request.endpoint == 'admin.users' %} aria-current="page"{% endif %}>Students & access</a>
+    <a class="admin-student-view" href="{{ url_for('main.dashboard') }}">Student view ↗</a>
+</nav></div>
+{% block admin_content %}{% endblock %}
+{% endblock %}

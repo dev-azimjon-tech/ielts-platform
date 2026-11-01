@@ -6,159 +6,21 @@
 <section class="ai-section ai-test-section">
     <div class="container ai-test-shell">
         <div class="ai-test-header"><div><a class="back-link" href="{{ url_for('ai.index') }}">← AI practice</a><p class="eyebrow">AI Speaking examiner</p><h1>{{ mock.title }}</h1><p>{{ mock.description }}</p></div><div class="mock-header-stats"><span>⏱ {{ mock.time_limit_minutes }} min</span><span>{{ limit - attempt_count }} AI mocks left</span></div></div>
-        <div class="ai-exam-notice"><strong>How this works</strong><span>Allow microphone access, listen to each AI question, and answer naturally. Your recording is transcribed for feedback and is not stored as audio.</span></div>
+        <div class="ai-exam-notice"><strong>How this works</strong><span>Allow microphone access, listen to each AI question, and answer naturally. Your recording is transcribed for feedback and saved privately for playback with your result.</span></div>
 
         <div class="speaking-progress"><span id="speaking-part-label">Part 1</span><span id="speaking-progress-label">Question 1 of {{ plan|length }}</span></div>
         <article class="speaking-card">
             <div class="speaking-question-top"><div><p class="eyebrow">AI examiner question</p><h2 id="speaking-question">{{ plan[0].question }}</h2></div><button class="button button-outline button-small" id="repeat-question" type="button">🔊 Repeat</button></div>
             <p class="speaking-instruction" id="speaking-instruction">{{ plan[0].instruction }}</p>
             <div class="speaking-prep" id="speaking-prep" hidden><strong id="prep-countdown">60</strong><span>seconds to prepare</span></div>
-            <div class="speaking-recorder"><div class="recording-status" id="recording-status"><span class="recording-dot"></span><span id="recording-message">Ready when you are.</span></div><div class="recorder-buttons"><button class="button" id="record-button" type="button">Start recording <span aria-hidden="true">●</span></button><button class="button button-outline" id="stop-button" type="button" hidden>Stop answer</button></div></div>
-            <div class="speaking-transcript" id="speaking-transcript" hidden><p class="eyebrow">What the AI heard</p><p id="transcript-text"></p></div>
-            <div class="ai-error" id="speaking-error" hidden></div>
+            <div class="speaking-recorder"><div class="recording-status" id="recording-status"><span class="recording-dot"></span><span id="recording-message" role="status">Ready when you are.</span></div><div class="recorder-buttons"><button class="button" id="record-button" type="button">Start recording <span aria-hidden="true">●</span></button><button class="button button-outline" id="stop-button" type="button" hidden>Stop answer</button><button class="button button-outline" id="retry-upload" type="button" hidden>Retry upload</button><button class="button" id="finish-saved-speaking" type="button" hidden>Get feedback for saved answers</button></div></div>
+            <div class="speaking-transcript" id="speaking-transcript" hidden><p class="eyebrow">Your last answer · AI transcript</p><p id="transcript-text"></p></div>
+            <div class="ai-error" id="speaking-error" role="alert" hidden></div>
         </article>
-        <p class="ai-test-footnote">This practice result is an AI estimate, not an official IELTS band score. Clear audio improves transcription quality.</p>
+        <p>Your recordings are saved privately with your completed result for playback.</p><p class="ai-test-footnote">This practice result is an AI estimate, not an official IELTS band score. Clear audio improves transcription quality.</p>
     </div>
 </section>
 
-<script>
-    const speakingPlan = {{ plan|tojson }};
-    const turnUrl = {{ url_for('ai.speaking_turn', mock_id=mock.id)|tojson }};
-    const completeUrl = {{ url_for('ai.complete_speaking', mock_id=mock.id)|tojson }};
-    const resultUrl = {{ url_for('ai.index')|tojson }};
-    let currentIndex = 0;
-    let currentQuestion = speakingPlan[0].question;
-    let history = [];
-    let mediaRecorder = null;
-    let recordingChunks = [];
-    let microphoneStream = null;
-    let prepTimer = null;
-    let allowExit = false;
-
-    const partLabel = document.getElementById('speaking-part-label');
-    const progressLabel = document.getElementById('speaking-progress-label');
-    const questionLabel = document.getElementById('speaking-question');
-    const instructionLabel = document.getElementById('speaking-instruction');
-    const recordButton = document.getElementById('record-button');
-    const stopButton = document.getElementById('stop-button');
-    const statusMessage = document.getElementById('recording-message');
-    const transcriptBox = document.getElementById('speaking-transcript');
-    const transcriptText = document.getElementById('transcript-text');
-    const errorBox = document.getElementById('speaking-error');
-    const prepBox = document.getElementById('speaking-prep');
-    const prepCountdown = document.getElementById('prep-countdown');
-
-    function announceQuestion() {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const voice = new SpeechSynthesisUtterance(currentQuestion);
-            voice.rate = 0.9;
-            window.speechSynthesis.speak(voice);
-        }
-    }
-
-    function showError(message) {
-        errorBox.hidden = false;
-        errorBox.textContent = message;
-        statusMessage.textContent = 'Something went wrong. You can try this answer again.';
-        recordButton.disabled = false;
-        stopButton.hidden = true;
-    }
-
-    function renderQuestion(item, index) {
-        currentIndex = index;
-        currentQuestion = item.question;
-        partLabel.textContent = `Part ${item.part}`;
-        progressLabel.textContent = `Question ${index + 1} of ${speakingPlan.length}`;
-        questionLabel.textContent = currentQuestion;
-        instructionLabel.textContent = item.instruction;
-        prepBox.hidden = true;
-        transcriptBox.hidden = true;
-        errorBox.hidden = true;
-        recordButton.disabled = false;
-        recordButton.hidden = false;
-        stopButton.hidden = true;
-        statusMessage.textContent = item.prep_seconds ? 'Start when ready. You will get one minute to prepare.' : 'Ready when you are.';
-        announceQuestion();
-    }
-
-    function startRecording() {
-        const item = speakingPlan[currentIndex];
-        if (item.prep_seconds && !prepBox.dataset.completed) {
-            let seconds = item.prep_seconds;
-            prepBox.hidden = false;
-            prepCountdown.textContent = seconds;
-            recordButton.disabled = true;
-            statusMessage.textContent = 'Prepare your answer. Recording will start automatically.';
-            prepTimer = window.setInterval(() => {
-                seconds -= 1;
-                prepCountdown.textContent = seconds;
-                if (seconds <= 0) {
-                    window.clearInterval(prepTimer);
-                    prepTimer = null;
-                    prepBox.dataset.completed = 'true';
-                    prepBox.hidden = true;
-                    recordButton.disabled = false;
-                    startRecording();
-                }
-            }, 1000);
-            return;
-        }
-        navigator.mediaDevices.getUserMedia({audio: true}).then((stream) => {
-            microphoneStream = stream;
-            recordingChunks = [];
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.addEventListener('dataavailable', (event) => recordingChunks.push(event.data));
-            mediaRecorder.addEventListener('stop', submitRecording, {once: true});
-            mediaRecorder.start();
-            recordButton.hidden = true;
-            stopButton.hidden = false;
-            statusMessage.textContent = 'Recording… speak naturally, then press Stop answer.';
-        }).catch(() => showError('Microphone access is required for Speaking practice. Please allow it in your browser and try again.'));
-    }
-
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-        if (microphoneStream) microphoneStream.getTracks().forEach((track) => track.stop());
-        stopButton.hidden = true;
-        statusMessage.textContent = 'Sending your answer to the AI examiner…';
-    }
-
-    async function submitRecording() {
-        const blob = new Blob(recordingChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
-        const form = new FormData();
-        form.append('audio', blob, `speaking-${currentIndex}.webm`);
-        form.append('plan_index', currentIndex);
-        form.append('question', currentQuestion);
-        form.append('history', JSON.stringify(history));
-        try {
-            const response = await fetch(turnUrl, {method: 'POST', body: form});
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.error || 'The AI could not process this answer.');
-            history = payload.turns;
-            transcriptText.textContent = payload.transcript;
-            transcriptBox.hidden = false;
-            if (payload.finished) {
-                statusMessage.textContent = 'All answers received. The AI is preparing your feedback…';
-                recordButton.disabled = true;
-                const resultResponse = await fetch(completeUrl, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({turns: history})});
-                const resultPayload = await resultResponse.json();
-                if (!resultResponse.ok) throw new Error(resultPayload.error || 'The AI could not score this Speaking mock.');
-                allowExit = true;
-                window.location.href = resultPayload.redirect;
-                return;
-            }
-            const next = payload.next;
-            speakingPlan[currentIndex + 1] = next;
-            renderQuestion(next, currentIndex + 1);
-        } catch (error) {
-            showError(error.message);
-        }
-    }
-
-    recordButton.addEventListener('click', startRecording);
-    stopButton.addEventListener('click', stopRecording);
-    document.getElementById('repeat-question').addEventListener('click', announceQuestion);
-    window.addEventListener('beforeunload', (event) => { if (!allowExit) { event.preventDefault(); event.returnValue = 'Your Speaking answers will be lost if you leave.'; } });
-</script>
+<script type="application/json" id="speaking-config">{{ {'csrf':app_csrf_token,'plan':plan,'turnUrl':url_for('ai.speaking_turn',mock_id=mock.id),'completeUrl':url_for('ai.complete_speaking',mock_id=mock.id),'storageKey':'ielts:speaking:v1:'~current_user.id~':'~mock.id}|tojson }}</script>
+<script src="{{ url_for('static',filename='js/speaking-practice.js') }}"></script>
 {% endblock %}

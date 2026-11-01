@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Vocabulary quiz · IELTS Platform{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/flashcards.css') }}">{% endblock %}
+{% block content %}
+<section class="vocab-section"><div class="container vocab-quiz-shell">
+    <a class="back-link" href="{{ url_for('flashcards.index') }}">← Your vocabulary</a>
+    <div class="page-heading"><div><p class="eyebrow">Test what sticks</p><h1>Your vocabulary quiz.</h1><p>{{ questions|length }} questions, all from your saved words. Choose the correct meaning for each one.</p></div></div>
+    <form method="post" action="{{ url_for('flashcards.quiz', quiz_id=quiz_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ flashcards_csrf_token }}">
+        <div class="vocab-quiz-questions">
+            {% for question in questions %}{% set question_number = loop.index0 %}
+                <fieldset class="vocab-quiz-question">
+                    <legend><span class="vocab-card-label">Question {{ loop.index }} of {{ questions|length }}</span><span>What does <strong>“{{ question.term }}”</strong> mean?</span></legend>
+                    <div class="vocab-choices">
+                        {% for choice in question.choices %}<label class="vocab-choice"><input type="radio" name="question_{{ question_number }}" value="{{ loop.index0 }}"{% if answers.get(question_number|string) == loop.index0 %} checked{% endif %} required><span class="vocab-choice-letter" aria-hidden="true">{{ 'ABCD'[loop.index0] }}</span><span>{{ choice }}</span></label>{% endfor %}
+                    </div>
+                </fieldset>
+            {% endfor %}
+        </div>
+        <div class="vocab-quiz-submit"><p>Take your time. Your score appears after you submit all answers.</p><button class="button" type="submit">Check my answers <span aria-hidden="true">→</span></button></div>
+    </form>
+</div></section>
+{% endblock %}

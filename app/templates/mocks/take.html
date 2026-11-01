@@ -1,224 +1,80 @@
 {% extends "base.html" %}
-
 {% block title %}{{ mock.title }} · IELTS Platform{% endblock %}
-
-{% block content %}
-<section class="mock-take-section">
-    <div class="container mock-shell">
-        <div class="mock-header">
-            <div>
-                <a class="back-link" href="{{ url_for('mocks.index') }}">← All mocks</a>
-                <p class="eyebrow">{{ mock.skill|capitalize }} mock</p>
-                <h1>{{ mock.title }}</h1>
-                <p>{{ mock.description }}</p>
-            </div>
-            <div class="mock-header-stats"><span>⏱ {{ mock.time_limit_minutes }} min</span>{% if current_user.is_premium %}<span class="premium-inline">Premium access</span>{% else %}<span>{{ remaining }} free remaining</span>{% endif %}</div>
-        </div>
-
-        <div class="step-toolbar">
-            <span class="step-kind">{% if mock.skill == 'reading' %}Passage{% else %}Section{% endif %}</span>
-            <span id="step-progress">1 of {{ mock.steps|length }}</span>
-        </div>
-
-        <form method="post" action="{{ url_for('mocks.submit', mock_id=mock.id) }}" id="mock-form">
-            {% for step in mock.steps %}
-                <section class="mock-step {% if loop.first %}is-active{% endif %}" data-step-index="{{ loop.index0 }}" aria-hidden="{{ 'false' if loop.first else 'true' }}">
-                    <div class="step-heading">
-                        <div>
-                            <p class="eyebrow">{% if mock.skill == 'reading' %}Passage {{ loop.index }}{% else %}Section {{ loop.index }}{% endif %}</p>
-                            <h2>{{ step.title }}</h2>
-                        </div>
-                        <span class="question-range">Questions {{ step.start_question }}–{{ step.end_question }}</span>
-                    </div>
-
-                    {% if mock.skill == 'reading' %}
-                        <article class="passage-card"><div class="passage-body">{{ step.body }}</div></article>
-                    {% else %}
-                        <div class="listening-instructions">
-                            <span class="instruction-icon">i</span>
-                            <div><strong>Before the audio starts</strong><p>Read questions {{ step.start_question }}–{{ step.end_question }}. You have <strong>20 seconds</strong> to read the instructions and questions. The audio will start automatically after the countdown.</p></div>
-                        </div>
-                        <div class="audio-panel" data-audio-step="{{ loop.index0 }}">
-                            <div><span class="audio-label">LISTENING AUDIO · DEMO</span><h3>{{ step.title }}</h3><p>The demo uses your browser's speech voice. A recorded MP3 can replace it later.</p></div>
-                            <button class="button audio-button start-audio" data-step-index="{{ loop.index0 }}" type="button">Start <span aria-hidden="true">▶</span></button>
-                            <p class="audio-status" aria-live="polite">Press Start, then read while the countdown runs.</p>
-                        </div>
-                    {% endif %}
-
-                    <div class="questions-card step-questions">
-                        <div class="questions-heading"><div><p class="eyebrow">Answer these questions</p><h2>{{ step.questions|length }} questions</h2></div><span>1 point each</span></div>
-                        {% for question in step.questions %}
-                            <fieldset class="question-block">
-                                <legend><span class="question-number">{{ question.question_number }}</span>{{ question.prompt }}</legend>
-                                {% if question.options %}
-                                    <div class="options-list">
-                                        {% for option in question.options %}
-                                            <label class="option-label"><input type="radio" name="question_{{ question.id }}" value="{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] if question.question_type == 'multiple_choice' else option }}"><span>{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] ~ '. ' if question.question_type == 'multiple_choice' else '' }}{{ option }}</span></label>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <input class="answer-input" type="text" name="question_{{ question.id }}" autocomplete="off" placeholder="Type your answer here">
-                                {% endif %}
-                            </fieldset>
-                        {% endfor %}
-                    </div>
-                </section>
-            {% endfor %}
-
-            <div class="step-navigation">
-                <button class="step-button step-previous" id="previous-step" type="button" disabled><span aria-hidden="true">&lt;</span> Previous</button>
-                <div class="step-navigation-right">
-                    <button class="button step-next" id="next-step" type="button">{% if mock.skill == 'reading' %}Next passage{% else %}Next section{% endif %} <span aria-hidden="true">&gt;</span></button>
-                    <button class="button step-submit" id="submit-mock" type="submit" hidden>Submit mock <span aria-hidden="true">→</span></button>
-                </div>
-            </div>
-        </form>
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/exam.css') }}">{% endblock %}
+{% block header %}
+<header class="exam-header">
+    <div class="exam-identity"><span class="exam-skill-mark" aria-hidden="true">{{ mock.skill[0]|upper }}</span><div><span class="exam-subtitle">{{ mock.skill|capitalize }} practice · {{ mock.time_limit_minutes }} minutes</span><h1>{{ mock.title }}</h1></div></div>
+    <div class="exam-header-actions">
+        {% include "_theme_toggle.html" %}
+        <a id="exit-mock" class="exam-exit" href="{{ url_for('mocks.index', skill=mock.skill) }}">Exit <span aria-hidden="true">↗</span></a>
     </div>
-</section>
-
-<script>
-    const mockSteps = {{ mock.steps|tojson }};
-    const stepCards = Array.from(document.querySelectorAll('.mock-step'));
-    const progressLabel = document.getElementById('step-progress');
-    const previousButton = document.getElementById('previous-step');
-    const nextButton = document.getElementById('next-step');
-    const submitButton = document.getElementById('submit-mock');
-    const listeningMock = {{ 'true' if mock.skill == 'listening' else 'false' }};
-    let activeStep = 0;
-    let countdownTimer = null;
-    let countdownButton = null;
-    let speakingStep = null;
-    let allowExit = false;
-    const exitMessage = 'You have not submitted this mock yet. Do you really want to leave? Your answers will be lost.';
-
-    function resetAudioButton(button) {
-        if (!button) return;
-        button.disabled = false;
-        button.innerHTML = button.dataset.started === 'true' ? 'Play again <span aria-hidden="true">▶</span>' : 'Start <span aria-hidden="true">▶</span>';
-    }
-
-    function stopPlayback() {
-        if (countdownTimer) {
-            window.clearInterval(countdownTimer);
-            countdownTimer = null;
-        }
-        if (countdownButton) {
-            countdownButton.dataset.counting = 'false';
-            resetAudioButton(countdownButton);
-            countdownButton = null;
-        }
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-        speakingStep = null;
-    }
-
-    function playSectionAudio(stepIndex, button) {
-        if (!('speechSynthesis' in window)) {
-            button.parentElement.querySelector('.audio-status').textContent = 'Your browser does not support demo audio. A recorded audio file will be added in a later version.';
-            return;
-        }
-
-        stopPlayback();
-        const status = button.parentElement.querySelector('.audio-status');
-        const utterance = new SpeechSynthesisUtterance(mockSteps[stepIndex].script);
-        utterance.rate = 0.88;
-        speakingStep = stepIndex;
-        button.innerHTML = 'Stop <span aria-hidden="true">■</span>';
-        status.textContent = 'Audio is playing…';
-        utterance.onend = () => {
-            if (speakingStep === stepIndex) {
-                speakingStep = null;
-                button.dataset.started = 'true';
-                resetAudioButton(button);
-                status.textContent = 'Audio finished. Continue with the questions.';
-            }
-        };
-        window.speechSynthesis.speak(utterance);
-    }
-
-    function startSectionAudio(button) {
-        const stepIndex = Number(button.dataset.stepIndex);
-        if (speakingStep === stepIndex) {
-            stopPlayback();
-            resetAudioButton(button);
-            button.parentElement.querySelector('.audio-status').textContent = 'Audio stopped. Press Play again when ready.';
-            return;
-        }
-        if (button.dataset.started === 'true') {
-            playSectionAudio(stepIndex, button);
-            return;
-        }
-
-        stopPlayback();
-        let seconds = 20;
-        const status = button.parentElement.querySelector('.audio-status');
-        countdownButton = button;
-        button.dataset.counting = 'true';
-        button.disabled = true;
-        button.textContent = `Read questions: ${seconds}s`;
-        status.textContent = 'Read the instructions and questions. Audio will start automatically.';
-        countdownTimer = window.setInterval(() => {
-            seconds -= 1;
-            if (seconds <= 0) {
-                window.clearInterval(countdownTimer);
-                countdownTimer = null;
-                countdownButton = null;
-                button.dataset.counting = 'false';
-                button.dataset.started = 'true';
-                button.disabled = false;
-                playSectionAudio(stepIndex, button);
-                return;
-            }
-            button.textContent = `Read questions: ${seconds}s`;
-        }, 1000);
-    }
-
-    function showStep(nextIndex) {
-        stopPlayback();
-        activeStep = nextIndex;
-        stepCards.forEach((card, index) => {
-            const active = index === activeStep;
-            card.classList.toggle('is-active', active);
-            card.setAttribute('aria-hidden', active ? 'false' : 'true');
-        });
-        progressLabel.textContent = `${activeStep + 1} of ${stepCards.length}`;
-        previousButton.disabled = activeStep === 0;
-        const isLastStep = activeStep === stepCards.length - 1;
-        nextButton.hidden = isLastStep;
-        submitButton.hidden = !isLastStep;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    previousButton.addEventListener('click', () => showStep(activeStep - 1));
-    nextButton.addEventListener('click', () => showStep(activeStep + 1));
-
-    document.getElementById('mock-form').addEventListener('submit', () => {
-        allowExit = true;
-        stopPlayback();
-    });
-
-    document.querySelectorAll('a[href]').forEach((link) => {
-        link.addEventListener('click', (event) => {
-            if (allowExit || link.target === '_blank') return;
-            if (!window.confirm(exitMessage)) {
-                event.preventDefault();
-                return;
-            }
-            allowExit = true;
-            stopPlayback();
-        });
-    });
-
-    window.addEventListener('beforeunload', (event) => {
-        if (allowExit) return;
-        event.preventDefault();
-        event.returnValue = exitMessage;
-        return exitMessage;
-    });
-
-    if (listeningMock) {
-        document.querySelectorAll('.start-audio').forEach((button) => {
-            button.addEventListener('click', () => startSectionAudio(button));
-        });
-    }
-</script>
+</header>
 {% endblock %}
+{% block content %}
+<section id="exam-root" class="exam-shell" data-draft-key="ielts:mock:v1:{{ current_user.id }}:{{ mock.id }}" data-skill="{{ mock.skill }}">
+    <div class="exam-toolbar">
+        <nav class="exam-step-tabs" aria-label="{{ 'Reading passages' if mock.skill == 'reading' else 'Listening sections' }}">
+            {% for step in mock.steps %}<button type="button" class="exam-step-tab{% if loop.first %} is-active{% endif %}" data-go-step="{{ loop.index0 }}" aria-current="{{ 'step' if loop.first else 'false' }}">{{ 'Passage' if mock.skill == 'reading' else 'Section' }} {{ loop.index }}</button>{% endfor %}
+        </nav>
+        <div class="exam-tools" aria-label="Study tools">
+            <button type="button" id="highlight-selection" class="exam-tool" title="Select text, then highlight (Alt+H)">Highlight selection</button>
+            <button type="button" id="quote-selection" class="exam-tool">Add selection to notes</button>
+            <button type="button" id="toggle-notes" class="exam-tool" aria-expanded="false" aria-controls="exam-notes">Notes</button>
+        </div>
+    </div>
+    <div class="exam-status-row"><p id="study-status" role="status">Select passage or question text to highlight it.</p><span id="draft-status" role="status">Progress saves in this browser</span></div>
+    <noscript><p class="flash flash-info">Enable JavaScript for passage navigation, audio, notes, and highlights.</p></noscript>
+    <form method="post" action="{{ url_for('mocks.submit', mock_id=mock.id) }}" id="mock-form">
+        <input type="hidden" name="csrf_token" value="{{ app_csrf_token }}">
+            {% if exam_session %}<input type="hidden" name="_exam_session" value="{{ exam_session.id }}"><input type="hidden" name="_exam_stage" value="{{ exam_session.stage }}"><input type="hidden" name="_exam_revision" value="{{ exam_revision }}">{% endif %}
+        <div class="exam-workspace">
+            <div class="exam-content">
+                {% for step in mock.steps %}
+                    {% set step_index = loop.index0 %}
+                    <section class="mock-step exam-step{% if loop.first %} is-active{% endif %}" data-step-index="{{ step_index }}" aria-hidden="{{ 'false' if loop.first else 'true' }}">
+                        <div class="exam-step-heading"><h2 tabindex="-1">{{ step.title }}</h2><span>{% if step.questions %}Questions {{ step.start_question }}–{{ step.end_question }}{% else %}No questions in this section{% endif %}</span></div>
+                        <div class="exam-panels{% if mock.skill == 'listening' %} listening-panels{% endif %}">
+                            {% if mock.skill == 'reading' %}
+                                <article class="exam-passage" aria-label="Passage {{ loop.index }} text"><p class="exam-panel-label">Read the passage</p><div class="passage-body highlightable" data-highlight-id="passage-{{ step.id }}">{{ step.body }}</div></article>
+                            {% else %}
+                                <div class="exam-audio-column">
+                                    <div class="exam-listening-instructions"><strong>Read first, then listen.</strong><p class="highlightable" data-highlight-id="instructions-{{ step.id }}">Read questions {{ step.start_question }}–{{ step.end_question }}. You have 20 seconds to read the instructions and questions before the audio starts.</p></div>
+                                    <div class="audio-panel exam-audio" data-audio-step="{{ step_index }}"><div><span class="audio-label">LISTENING PRACTICE</span><p>This practice uses a computer voice. Use headphones in a quiet place.</p></div><button class="button start-audio" data-step-index="{{ step_index }}" type="button">Start audio <span aria-hidden="true">▶</span></button><p class="audio-status" role="status">Press Start audio to begin your 20-second preparation time.</p></div>
+                                </div>
+                            {% endif %}
+                            <div class="exam-questions" aria-label="Questions for {{ step.title }}">
+                                <div class="exam-questions-heading"><p class="exam-panel-label">Your answers</p><span class="step-answer-count" data-total="{{ step.questions|length }}">0 / {{ step.questions|length }} answered</span></div>
+                                {% for question in step.questions %}
+                                    <fieldset class="question-block" id="question-{{ question.question_number }}" data-question-number="{{ question.question_number }}" data-step="{{ step_index }}" tabindex="-1">
+                                        <legend><span class="question-number">{{ question.question_number }}</span><span class="highlightable" data-highlight-id="question-{{ question.id }}">{{ question.prompt }}</span></legend>
+                                        {% if question.options %}
+                                            <div class="options-list">{% for option in question.options %}<label class="option-label"><input type="radio" name="question_{{ question.id }}" value="{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] if question.question_type == 'multiple_choice' else option }}"><span class="highlightable" data-highlight-id="option-{{ question.id }}-{{ loop.index0 }}">{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] ~ '. ' if question.question_type == 'multiple_choice' else '' }}{{ option }}</span></label>{% endfor %}</div>
+                                        {% else %}
+                                            <label class="sr-only" for="answer-{{ question.id }}">Answer for question {{ question.question_number }}</label><input id="answer-{{ question.id }}" class="answer-input" type="text" name="question_{{ question.id }}" autocomplete="off" placeholder="Type your answer" maxlength="500">
+                                        {% endif %}
+                                    </fieldset>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
+            <aside id="exam-notes" class="exam-notes" aria-label="Practice notes" hidden>
+                <div class="notes-heading"><h2>Your notes</h2><button type="button" id="close-notes" class="exam-tool" aria-label="Close notes">×</button></div>
+                <label for="section-notes" id="notes-label">Notes for {{ 'passage' if mock.skill == 'reading' else 'section' }} 1</label>
+                <textarea id="section-notes" rows="12" maxlength="20000" placeholder="Keep keywords, reminders, and ideas here…" aria-describedby="notes-help"></textarea>
+                <p id="notes-help">Notes and highlights save on this device. They are not scored.</p>
+                <button type="button" id="clear-highlights" class="exam-tool">Clear this section's highlights</button>
+            </aside>
+        </div>
+        <div class="exam-bottom-bar">
+            <div class="exam-answer-summary"><span id="step-progress">1 of {{ mock.steps|length }}</span><strong id="answered-progress">0 / {{ mock.questions|length }} answered</strong></div>
+            <nav class="exam-question-nav" aria-label="Jump to a question">{% for step in mock.steps %}{% for question in step.questions %}<button type="button" class="question-jump" data-go-question="{{ question.question_number }}" aria-label="Question {{ question.question_number }}, unanswered">{{ question.question_number }}</button>{% endfor %}{% endfor %}</nav>
+            <div class="step-navigation"><button class="step-button" id="previous-step" type="button" disabled><span aria-hidden="true">&lt;</span> Previous</button><span class="exam-save-hint">Your work stays here if you refresh.</span><div class="step-navigation-right"><button class="button step-next" id="next-step" type="button">{{ 'Next passage' if mock.skill == 'reading' else 'Next section' }} <span aria-hidden="true">&gt;</span></button><button class="button step-submit" id="submit-mock" type="submit"{% if mock.steps|length > 1 %} hidden{% endif %}>Submit mock <span aria-hidden="true">→</span></button></div></div>
+        </div>
+    </form>
+</section>
+<script id="listening-scripts" type="application/json">{{ listening_scripts|tojson }}</script>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/exam.js') }}" defer></script>{% endblock %}

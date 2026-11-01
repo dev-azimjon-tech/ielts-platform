@@ -4,3 +4,7 @@ python-dotenv>=1.0,<2
 ollama>=0.6,<1
 faster-whisper>=1.1,<2
 pytest>=8,<9
+
+# Decode browser recordings to Whisper samples with the supported PyAV API.
+av>=11,<20
+numpy>=1.26,<3

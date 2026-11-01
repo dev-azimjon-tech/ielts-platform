@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Vocabulary quiz result · IELTS Platform{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/flashcards.css') }}">{% endblock %}
+{% block content %}
+<section class="vocab-section"><div class="container vocab-quiz-shell">
+    <a class="back-link" href="{{ url_for('flashcards.index') }}">← Your vocabulary</a>
+    <div class="vocab-result-hero"><p class="eyebrow">Your vocabulary, growing</p><h1>{% if score == questions|length %}Every word remembered.{% elif percentage >= 60 %}Your practice is paying off.{% else %}A good place to keep learning.{% endif %}</h1><strong class="vocab-result-score">{{ score }} <small>/ {{ questions|length }}</small></strong><p>{{ percentage }}% correct · {% if score == questions|length %}Keep building your collection.{% else %}Review the meanings below and give them another try.{% endif %}</p></div>
+    <div class="vocab-result-actions">
+        <form method="post" action="{{ url_for('flashcards.start_quiz') }}"><input type="hidden" name="csrf_token" value="{{ flashcards_csrf_token }}"><button class="button" type="submit">Try another quiz</button></form>
+        <a class="button button-outline" href="{{ url_for('flashcards.study') }}">Review flashcards</a>
+    </div>
+    <section class="vocab-review"><p class="eyebrow">Make it stick</p><h2>Your answer review</h2>
+        {% for question in questions %}{% set selected = answers[loop.index0|string] %}{% set correct = selected == question.correct %}
+            <article class="vocab-review-card {{ 'vocab-correct' if correct else 'vocab-incorrect' }}">
+                <div class="vocab-review-title"><h3>{{ question.term }}</h3><span>{{ '✓ Correct' if correct else '↻ Review this word' }}</span></div>
+                <p><span class="vocab-card-label">Your answer</span>{{ question.choices[selected] }}</p>
+                {% if not correct %}<p class="vocab-correct-answer"><span class="vocab-card-label">Correct meaning</span>{{ question.choices[question.correct] }}</p>{% endif %}
+                {% if question.example %}<p class="vocab-example">{{ question.example }}</p>{% endif %}
+            </article>
+        {% endfor %}
+    </section>
+</div></section>
+{% endblock %}

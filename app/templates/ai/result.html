@@ -2,6 +2,7 @@
 
 {% block title %}AI feedback · IELTS Platform{% endblock %}
 
+{% block extra_head %}{% if result.skill=='speaking' %}<link rel="stylesheet" href="{{ url_for('static',filename='css/speaking-review.css') }}">{% endif %}{% endblock %}
 {% block content %}
 <section class="ai-section">
     <div class="container ai-result-shell">
@@ -16,11 +17,13 @@
         </div>
         <div class="ai-feedback-grid"><section class="ai-feedback-card"><p class="eyebrow">Examiner summary</p><p class="ai-feedback-text">{{ result.feedback.feedback }}</p></section><section class="ai-feedback-card"><p class="eyebrow">What you did well</p><ul>{% for item in result.feedback.strengths %}<li>{{ item }}</li>{% endfor %}</ul></section><section class="ai-feedback-card"><p class="eyebrow">Next improvements</p><ul>{% for item in result.feedback.improvements %}<li>{{ item }}</li>{% endfor %}</ul></section></div>
         {% if result.skill == 'speaking' %}
-            <section class="ai-transcript-card"><p class="eyebrow">Speaking transcript</p><h2>What the AI heard</h2>{% for turn in result.turns %}<div class="transcript-turn"><span>Part {{ turn.part }}</span><div><strong>{{ turn.question }}</strong><p>{{ turn.transcript }}</p></div></div>{% endfor %}</section>
+            {% include 'ai/_speaking_review.html' %}
         {% else %}
-            <details class="ai-submission-card"><summary>View submitted essay</summary><p>{{ result.submission_text }}</p></details>
+            <a class="button button-outline" href="{{ url_for('learning.revise',attempt_id=result.id) }}">Revise this essay →</a><details class="ai-submission-card"><summary>View submitted essay</summary><p>{{ result.submission_text }}</p></details>
         {% endif %}
         <a class="button" href="{{ url_for('ai.index') }}">Try another AI practice →</a>
     </div>
 </section>
 {% endblock %}
+
+{% block scripts %}{% if result.skill=='speaking' %}<script src="{{ url_for('static',filename='js/speaking-review.js') }}" defer></script>{% endif %}{% endblock %}
